@@ -1,0 +1,631 @@
+diff --git a/.github/workflows/build.yaml b/.github/workflows/build.yaml
+index 818af50..eb72649 100644
+--- a/.github/workflows/build.yaml
++++ b/.github/workflows/build.yaml
+@@ -13,24 +13,24 @@ jobs:
+         os:
+           - ubuntu:latest
+           - ubuntu:22.04
+-          - debian:latest
+-          - debian:stable
+-          - debian:oldstable
+-          - almalinux:latest
+-          - amazonlinux:latest
+-          - fedora:latest
+-          - oraclelinux:9
+-          - alpine:latest
+-          - archlinux:latest
+-          - clearlinux:latest
+-          - gentoo/stage3:musl-hardened
+-          - gentoo/stage3:hardened
+-          - freebsd
++          # - debian:latest
++          # - debian:stable
++          # - debian:oldstable
++          # - almalinux:latest
++          # - amazonlinux:latest
++          # - fedora:latest
++          # - oraclelinux:9
++          # - alpine:latest
++          # - archlinux:latest
++          # - clearlinux:latest
++          # - gentoo/stage3:musl-hardened
++          # - gentoo/stage3:hardened
++          # - freebsd
+         config:
+           - cmake_args: "-DENABLE_API=ON -DCMAKE_C_COMPILER=gcc"
+           - cmake_args: "-DENABLE_API=ON -DCMAKE_C_COMPILER=clang"
+-          - cmake_args: "-DENABLE_API=ON -DCMAKE_C_COMPILER=gcc -DCMAKE_C_FLAGS=-DDATUM_API_FOR_UMBREL=ON"
+-          - cmake_args: "-DENABLE_API=OFF"
++          # - cmake_args: "-DENABLE_API=ON -DCMAKE_C_COMPILER=gcc -DCMAKE_C_FLAGS=-DDATUM_API_FOR_UMBREL=ON"
++          # - cmake_args: "-DENABLE_API=OFF"
+         exclude:
+           # Clang configured for C11 rejects our C23 usage
+           - os: debian:oldstable
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 104a6c0..bec1734 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -23,6 +23,7 @@ add_executable(datum_gateway
+ 	src/datum_conf.c
+ 	src/datum_conf_tests.c
+ 	src/datum_gateway.c
++	src/datum_hook.c
+ 	src/datum_jsonrpc.c
+ 	src/datum_logger.c
+ 	src/datum_protocol.c
+diff --git a/README.hooked.md b/README.hooked.md
+new file mode 100644
+index 0000000..514c1c4
+--- /dev/null
++++ b/README.hooked.md
+@@ -0,0 +1,61 @@
++# DATUM Gateway with hooks
++
++A hook is added for accepted work.
++Prototype, work-in-progress.
++
++
++## New config elements
++
++- Upstream username: The username of the proxy pool at the upstream pool (at Ocean it is a bitcoin address, "bc1xxxsomething..."). Proxy usernames are converted to this when forwarded to the upstream pool.
++
++- Workstat service URL: This is an accessible API which is invoked with every accepted work share.
++
++```
++	"proxypool": {
++		"upstream_username": "bc1xxxsomething",
++		"workstat_api_url": "http://localhost:5000/api/"
++	}
++```
++
++
++## Username mapping
++
++The incoming usernames are changed to the upstream username of the proxy pool.
++
++For usernames with optional device names, a unique device name is used, to keep device shares separate. The device ID is generated deterministically from the hash of the original full username.
++
++Mapping examples:
++
++```
++	npub12gygh77v0ux4xk73vvht34lf3g8hs3vfsdjs823ts6pce9n28ehq8edvt8             -->    bc1q98wufxmtfh5qlk7fe5dzy2z8cflvqjysrh4fx2
++	npub12gygh77v0ux4xk73vvht34lf3g8hs3vfsdjs823ts6pce9n28ehq8edvt8.bitaxe      -->    bc1q98wufxmtfh5qlk7fe5dzy2z8cflvqjysrh4fx2.8c65fb71
++```
++
++
++## Workstat service
++
++The workstat service is used to pass information about each accepted work share.
++
++The API is called `work-insert`, with HTTP POST, and is supplied with Json-formatted data containing:
++
++- the usernames (original and mapped), and
++
++- the difficulty of the work.
++
++Example:
++
++```json
++  {
++    "uname_o": "npub12gygh77v0ux4xk73vvht34lf3g8hs3vfsdjs823ts6pce9n28ehq8edvt8",
++    "uname_u": "bc1q98wufxmtfh5qlk7fe5dzy2z8cflvqjysrh4fx2",
++    "tdiff": 131072
++  }
++```
++
++See https://github.com/zappool/zappool-backend/tree/main/workstat for an implementation example.
++
++
++## To generate diff file:
++
++git diff <commit>
++git diff cd7b7a3
+diff --git a/doc/example_datum_gateway_config.json b/doc/example_datum_gateway_config.json
+index e46d983..d4481fc 100644
+--- a/doc/example_datum_gateway_config.json
++++ b/doc/example_datum_gateway_config.json
+@@ -30,5 +30,9 @@
+ 		"pool_pass_workers": true,
+ 		"pool_pass_full_users": true,
+ 		"pooled_mining_only": true
++	},
++	"proxypool": {
++		"upstream_username": "bc1xxxsomething",
++		"workstat_api_url": "http://localhost:5000/api/"
+ 	}
+ }
+diff --git a/src/datum_conf.c b/src/datum_conf.c
+index 0e4317b..ca59950 100644
+--- a/src/datum_conf.c
++++ b/src/datum_conf.c
+@@ -188,6 +188,12 @@ const T_DATUM_CONFIG_ITEM datum_config_options[] = {
+ 		.required = false, .ptr = &datum_config.datum_pooled_mining_only, 	.default_bool = true },
+ 	{ .var_type = DATUM_CONF_INT, 		.category = "datum", 		.name = "protocol_global_timeout",		.description = "If no valid messages are received from the DATUM server in this many seconds, give up and try to reconnect",
+ 		.required = false, .ptr = &datum_config.datum_protocol_global_timeout, 	.default_int = 60 },
++
++	// proxypool options ("hooked")
++	{ .var_type = DATUM_CONF_STRING, 	.category = "proxypool", 		.name = "upstream_username",		.description = "The username of the proxypool at the upstream pool", .example_default = true,
++		.required = true, .ptr = &datum_config.proxypool_us_username, 	.default_string[0] = "bc1xxxsomething", .max_string_len = sizeof(datum_config.proxypool_us_username) },
++	{ .var_type = DATUM_CONF_STRING, 	.category = "proxypool", 		.name = "workstat_api_url",		.description = "Workstat server API URL", .example_default = true,
++		.required = true, .ptr = &datum_config.workstat_api_url, 	.default_string[0] = "http://localhost:5000/api/", .max_string_len = sizeof(datum_config.workstat_api_url) }
+ };
+ 
+ #define NUM_CONFIG_ITEMS (sizeof(datum_config_options) / sizeof(datum_config_options[0]))
+diff --git a/src/datum_conf.h b/src/datum_conf.h
+index 0abf972..0fdb8a0 100644
+--- a/src/datum_conf.h
++++ b/src/datum_conf.h
+@@ -165,6 +165,9 @@ typedef struct {
+ 	int override_mining_pool_scriptsig_len;
+ 	char override_mining_coinbase_tag_primary[256];
+ 	uint64_t override_vardiff_min;
++
++	char proxypool_us_username[256];
++	char workstat_api_url[1024];
+ } global_config_t;
+ 
+ extern global_config_t datum_config;
+diff --git a/src/datum_gateway.c b/src/datum_gateway.c
+index c495582..bd87e6d 100644
+--- a/src/datum_gateway.c
++++ b/src/datum_gateway.c
+@@ -60,6 +60,7 @@
+ #include "datum_api.h"
+ #include "datum_coinbaser.h"
+ #include "datum_protocol.h"
++#include "datum_hook.h"
+ 
+ const char *datum_gateway_config_filename = NULL;
+ 
+@@ -103,6 +104,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
+ 			exit(0);
+ 			break;
+ 		case 0x101:  // test
++			// do_hook_test();
+ 			datum_utils_tests();
+ 			datum_conf_tests();
+ 			datum_stratum_tests();
+@@ -178,7 +180,10 @@ int main(const int argc, const char * const * const argv) {
+ 		exit(1);
+ 	}
+ 	datum_gateway_config_filename = arguments.config_file;
+-	
++
++	hook_init();
++	// do_hook_test();
++
+ 	// Initialize logger thread
+ 	datum_logger_init();
+ 	
+diff --git a/src/datum_hook.c b/src/datum_hook.c
+new file mode 100644
+index 0000000..001a7c8
+--- /dev/null
++++ b/src/datum_hook.c
+@@ -0,0 +1,273 @@
++/*
++ *
++ * DATUM Gateway
++ * Decentralized Alternative Templates for Universal Mining
++ *
++ * This file is part of OCEAN's Bitcoin mining decentralization
++ * project, DATUM.
++ *
++ * https://ocean.xyz
++ *
++ * ---
++ *
++ * Copyright (c) 2024 Bitcoin Ocean, LLC & Jason Hughes
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be
++ * included in all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
++ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
++ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
++ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++ *
++ */
++
++// This is quick and dirty for now.  Will be improved over time.
++
++// #include <assert.h>
++// #include <limits.h>
++// #include <stdio.h>
++// #include <stdlib.h>
++// #include <microhttpd.h>
++// #include <arpa/inet.h>
++// #include <netinet/in.h>
++// #include <pthread.h>
++// #include <inttypes.h>
++// #include <jansson.h>
++
++#include "datum_hook.h"
++
++#include "datum_conf.h"
++#include "datum_utils.h"
++
++#include <string.h>
++#include <curl/curl.h>
++
++
++#define WORKER_HASH_LEN 8
++
++// Size for http response write buffer
++#define HTTP_RESPONSE_BUFFER_SIZE 10000
++
++// Callback function to handle response data
++size_t http_write_callback(void *contents, size_t size, size_t nmemb, char *buf, size_t bufsize) {
++	size_t total_size = size * nmemb;
++	size_t remain_buf_size;
++	remain_buf_size = HTTP_RESPONSE_BUFFER_SIZE - strlen(buf);
++	strncat(buf, (const char*)contents, remain_buf_size);
++	return total_size;
++}
++
++int ping_workstat() {
++	// Initialize libcurl
++	CURL* curl = curl_easy_init();
++
++	if (!curl) {
++		fprintf(stderr, "Error: Failed to initialize libcurl\n");
++		return -1;
++	}
++
++	// Store the response
++	char response_data[HTTP_RESPONSE_BUFFER_SIZE];
++	response_data[0] = 0;
++
++	char url[1500];
++	snprintf(url, sizeof(url), "%sping", datum_config.workstat_api_url);
++
++	// Set libcurl options
++	curl_easy_setopt(curl, CURLOPT_URL, url);
++	// curl_easy_setopt(curl, CURLOPT_POST, 1L);
++
++	// Set headers
++	struct curl_slist* headers = NULL;
++	headers = curl_slist_append(headers, "Content-Type: application/json");
++	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
++
++	// Set the write callback function
++	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, http_write_callback);
++	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_data);
++
++	// Perform the request
++	CURLcode res = curl_easy_perform(curl);
++
++	// Check for errors
++	if (res != CURLE_OK) {
++		fprintf(stderr, "Error: %s \n", curl_easy_strerror(res));
++		return -2;
++	} else {
++		// Get HTTP response code
++		long http_code = 0;
++		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
++
++		// printf("HTTP Response Code: %ld \n", http_code);
++		if (http_code != 200) {
++			fprintf(stderr, "Error response code: %ld \n", http_code);
++			return -3;
++		}
++		// printf("Response: %s \n", response_data);
++	}
++
++	// Clean up
++	curl_slist_free_all(headers);
++	curl_easy_cleanup(curl);
++
++	return 0;
++}
++
++int submit_work_workstat(const char *username_orig, const char *username_upstream, uint64_t target_diff) {
++	// Initialize libcurl
++	CURL* curl = curl_easy_init();
++
++	if (!curl) {
++		fprintf(stderr, "Error: Failed to initialize libcurl\n");
++		return -1;
++	}
++
++	// Create the JSON payload
++	char json_payload[1000];
++	snprintf(json_payload, sizeof(json_payload), "{\"uname_o\": \"%s\", \"uname_u\": \"%s\", \"tdiff\": %ld}", username_orig, username_upstream, target_diff);
++
++	// Store the response
++	char response_data[HTTP_RESPONSE_BUFFER_SIZE];
++	response_data[0] = 0;
++
++	char url[1500];
++	snprintf(url, sizeof(url), "%swork-insert", datum_config.workstat_api_url);
++
++	// Set libcurl options
++	curl_easy_setopt(curl, CURLOPT_URL, url);
++	curl_easy_setopt(curl, CURLOPT_POST, 1L);
++	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_payload);
++
++	// Set headers
++	struct curl_slist* headers = NULL;
++	headers = curl_slist_append(headers, "Content-Type: application/json");
++	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
++
++	// Set the write callback function
++	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, http_write_callback);
++	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_data);
++
++	// Perform the request
++	// printf("Sending POST request to %s \n", url);
++	// printf("Payload: %s \n", json_payload);
++
++	CURLcode res = curl_easy_perform(curl);
++
++	// Check for errors
++	if (res != CURLE_OK) {
++		fprintf(stderr, "Error: %s \n", curl_easy_strerror(res));
++		return -2;
++	} else {
++		// Get HTTP response code
++		long http_code = 0;
++		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
++
++		// printf("HTTP Response Code: %ld \n", http_code);
++		if (!((http_code == 200) || (http_code == 201))) {
++			fprintf(stderr, "Error response code: %ld \n", http_code);
++			return -3;
++		}
++		printf("Response: %s \n", response_data);
++	}
++
++	// Clean up
++	curl_slist_free_all(headers);
++	curl_easy_cleanup(curl);
++
++	return 0;
++}
++
++int hook_init() {
++	printf("datum_hook: hook_init \n");
++
++	int ping_workstat_res;
++	ping_workstat_res = ping_workstat();
++	if (ping_workstat_res) {
++		fprintf(stderr, "Error pinging workstat API: %d \n", ping_workstat_res);
++		return ping_workstat_res;
++	}
++
++	printf("datum_hook: hook_init OK \n");
++
++	return 0;
++}
++
++int submit_hook(
++	const char *username_in,
++	char* username_out,
++	size_t username_out_buflen
++) {
++	// Upstream username: from config
++	const char* us_username = datum_config.proxypool_us_username;
++
++	// Upstream worker: hashed from full original username (incl. worker)
++	unsigned char hash[32];
++	if (!my_sha256((void*)hash, (const void*)username_in, strlen(username_in))) {
++		printf("datum_hook: submit_hook: Error in hashing \n");
++		return -1;
++	}
++	char hashstr[65];
++	hash2hex(hash, hashstr);
++	// printf("hashstr %s \n", hashstr);
++	// crop it
++	hashstr[WORKER_HASH_LEN] = 0;
++	// printf("hashstr %s \n", hashstr);
++
++	// Concatenate
++	char us_username_full[512];
++	snprintf(us_username_full, sizeof(us_username_full), "%s.%s", us_username, hashstr);
++	// printf("us_username_full %s \n", us_username_full);
++
++	strncpy(username_out, us_username_full, username_out_buflen);
++	printf("datum_hook: submit_hook user_in: '%s' user_out: '%s' \n", username_in, username_out);
++	return 0;
++}
++
++int accept_hook(
++	const char *username_orig,
++	const char *username_upstream,
++	const uint64_t target_diff,
++	const T_DATUM_STRATUM_JOB *_job
++) {
++	printf("datum_hook: accept_hook user '%s' '%s'  tdiff %ld \n", username_orig, username_upstream, target_diff);
++
++	int res;
++	res = submit_work_workstat(username_orig, username_upstream, target_diff);
++	if (!res) {
++		return res;
++	}
++
++	return 0;
++}
++
++int do_hook_test() {
++	// uint64_t a = 3, b = 5, c = 0;
++	// c = mh_add(3, 5);
++	// printf("ADD %ld + %ld = %ld\n", a, b, c);
++
++	const char* user_orig = "lnaddress1dummy.bitaxe";
++
++	char user_upstream[100];
++
++	int sres;
++	sres = submit_hook(user_orig, user_upstream, sizeof(user_upstream));
++	printf("do_hook_test: user after submit: '%s' %d \n", user_upstream, sres);
++
++	int ares;
++	ares = accept_hook(user_orig, user_upstream, 65536, NULL);
++	printf("do_hook_test: ares %d \n", ares);
++
++	return 0;
++}
+diff --git a/src/datum_hook.h b/src/datum_hook.h
+new file mode 100644
+index 0000000..3b89051
+--- /dev/null
++++ b/src/datum_hook.h
+@@ -0,0 +1,71 @@
++/*
++ *
++ * DATUM Gateway
++ * Decentralized Alternative Templates for Universal Mining
++ *
++ * This file is part of OCEAN's Bitcoin mining decentralization
++ * project, DATUM.
++ *
++ * https://ocean.xyz
++ *
++ * ---
++ *
++ * Copyright (c) 2024 Bitcoin Ocean, LLC & Jason Hughes
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be
++ * included in all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
++ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
++ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
++ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++ *
++ */
++
++#ifndef _DATUM_HOOK_H_
++#define _DATUM_HOOK_H_
++
++#include "datum_stratum.h"
++
++int hook_init();
++
++/// @brief Called before work package submit, performs username mapping,
++/// from miner username to upstream proxy pool username.
++/// @param username_in - Original full miner username
++/// @param username_out - Buffer to hold mapped username
++/// @param username_out_buflen - Size of username_out buffer
++/// @return 0 on success
++int submit_hook(
++	const char *username_in,
++	char* username_out,
++	size_t username_out_buflen
++);
++
++/// @brief Called at work package submit
++/// TODO: Currently called just before submission to upstream pool; should be done after acceptance.
++/// @param username_orig - Original full miner username
++/// @param username_upstream - Upstream full username (proxypool username + derived worker)
++/// @param target_diff - Target difficulty
++/// @param job - Job structure
++/// @return 0 on success
++int accept_hook(
++	const char *username_orig,
++	const char *username_upstream,
++	const uint64_t target_diff,
++	const T_DATUM_STRATUM_JOB *job
++);
++
++int do_hook_test();
++
++#endif
+diff --git a/src/datum_stratum.c b/src/datum_stratum.c
+index 67befac..cb508ed 100644
+--- a/src/datum_stratum.c
++++ b/src/datum_stratum.c
+@@ -58,6 +58,7 @@
+ #include "datum_coinbaser.h"
+ #include "datum_submitblock.h"
+ #include "datum_protocol.h"
++#include "datum_hook.h"
+ 
+ T_DATUM_SOCKET_APP *global_stratum_app = NULL;
+ 
+@@ -1204,6 +1205,12 @@ int client_mining_submit(T_DATUM_CLIENT_DATA *c, uint64_t id, json_t *params_obj
+ 	my_sha256(digest_temp, block_header, 80);
+ 	my_sha256(share_hash, digest_temp, 32);
+ 	
++	char block_target_hex[72];
++	char share_hash_hex[72];
++	hash2hex(job->block_target, block_target_hex);
++	hash2hex(share_hash, share_hash_hex);
++	DLOG_DEBUG("block target %s   share hash %s", block_target_hex, share_hash_hex);
++
+ 	if (upk_u32le(share_hash, 28) != 0) {
+ 		// H-not-zero
+ 		//LOG_PRINTF("HIGH HASH: %8.8lx", (unsigned long)upk_u32le(share_hash, 28));
+@@ -1233,6 +1240,15 @@ int client_mining_submit(T_DATUM_CLIENT_DATA *c, uint64_t id, json_t *params_obj
+ 		}
+ 	}
+ 	
++	char username_us[256];
++	// invoke the submit hook
++	int submit_hook_res;
++	submit_hook_res = submit_hook(username_s, username_us, sizeof(username_us));
++	if (submit_hook_res) {
++		DLOG_ERROR("******** Error from submit_hook, res %d, user %s ********", submit_hook_res, username_s);
++		strncpy(username_us, username_s, sizeof(username_us));
++	}
++
+ 	// most important thing to do right here is to check if the share is a block
+ 	// there's some downstream failures that can impact the share being valid, but at this point it's
+ 	// possible for this block to be valid.  even if it's stale or something we're going to try it.
+@@ -1257,7 +1273,15 @@ int client_mining_submit(T_DATUM_CLIENT_DATA *c, uint64_t id, json_t *params_obj
+ 		
+ 		if (job->is_datum_job) {
+ 			// submit via DATUM
+-			datum_protocol_pow_submit(c, job, username_s, was_block, empty_work, quickdiff, block_header, job_diff, full_cb_txn, cb, extranonce_bin, coinbase_index);
++			datum_protocol_pow_submit(c, job, username_us, was_block, empty_work, quickdiff, block_header, job_diff, full_cb_txn, cb, extranonce_bin, coinbase_index);
++
++			// invoke a hook for the accepted work
++			// TODO: it's more precise to have this in datum_protocol_share_response(), but we don't have the username there
++			int accept_hook_res;
++			accept_hook_res = accept_hook(username_s, username_us, job_diff, job);
++			if (accept_hook_res) {
++				DLOG_ERROR("******** Error from accept_hook, res %d, user %s %s ********", accept_hook_res, username_s, username_us);
++			}
+ 		}
+ 	}
+ 	
+@@ -1330,7 +1354,15 @@ int client_mining_submit(T_DATUM_CLIENT_DATA *c, uint64_t id, json_t *params_obj
+ 	if (!was_block) {
+ 		if (job->is_datum_job) {
+ 			// submit via DATUM
+-			datum_protocol_pow_submit(c, job, username_s, was_block, empty_work, quickdiff, block_header, job_diff, full_cb_txn, cb, extranonce_bin, coinbase_index);
++			datum_protocol_pow_submit(c, job, username_us, was_block, empty_work, quickdiff, block_header, job_diff, full_cb_txn, cb, extranonce_bin, coinbase_index);
++
++			// invoke a hook for the accepted work
++			// TODO: it's more precise to have this in datum_protocol_share_response(), but we don't have the username there
++			int accept_hook_res;
++			accept_hook_res = accept_hook(username_s, username_us, job_diff, job);
++			if (accept_hook_res) {
++				DLOG_ERROR("******** Error from accept_hook, res %d, user %s %s ********", accept_hook_res, username_s, username_us);
++			}
+ 		}
+ 	}
+ 	

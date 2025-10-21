@@ -1,0 +1,38 @@
+{
+        "bitcoind": {
+                "rpcuser": "bitcoin",
+                "rpcpassword": "<password>",
+                "rpcurl": "http://localhost:8332",
+                "notify_fallback": true
+        },
+        "stratum": {
+                "listen_port": 27334
+        },
+        "mining": {
+                "pool_address": "bc1q98wufxmtfh5qlk7fe5dzy2z8cflvqjysrh4fx2",
+                "coinbase_tag_primary": "Zappool",
+                "coinbase_tag_secondary": "Zappool"
+        },
+        "api": {
+                "admin_password": "",
+                "listen_port": 7152,
+                "modify_conf": false
+        },
+        "logger": {
+                "log_to_console": true,
+                "log_to_file": true,
+                "log_file": "/var/lib/datum_gateway/datum.log",
+                "log_rotate_daily": true,
+                "log_level_console": 1,
+                "log_level_file": 1
+        },
+        "datum": {
+                "pool_pass_workers": true,
+                "pool_pass_full_users": true,
+                "pooled_mining_only": true
+        },
+        "proxypool": {
+                "upstream_username": "bc1q98wufxmtfh5qlk7fe5dzy2z8cflvqjysrh4fx2",
+                "workstat_api_url": "http://localhost:5004/api/"
+        }
+}
