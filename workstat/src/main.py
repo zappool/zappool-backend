@@ -8,9 +8,15 @@ import dotenv
 from flask import Flask, request, jsonify, render_template_string
 import sqlite3
 import os
+import sys
 
 dotenv.load_dotenv()
 API_SECRET = os.getenv("WORKSTAT_SECRET")
+if not API_SECRET or len(API_SECRET) < 2:
+    print(f"Error: API_SECRET is unset or too weak '{API_SECRET}'")
+    sys.exit(-1)
+print(f"Using Api secret, len {len(API_SECRET)}")
+
 app = Flask(__name__)
 
 # Database configuration
@@ -182,7 +188,7 @@ def add_work():
         # Validate secret
         if secret != API_SECRET:
             print(f"Wrong API secret received! ({secret}) (expected secret from .env)")
-            return jsonify({"error": f"Incorrect API secret '{secret}'"}), 500
+            return jsonify({"error": f"Incorrect API secret!"}), 500
 
         # Insert work item into database
         try:
