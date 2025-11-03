@@ -9,14 +9,14 @@ This module provides a REST API and HTML form interface for adding work items to
 - Flask (install with `pip install flask`)
 
 ### Database Configuration
-The API is configured to use a SQLite database file named `workstat.db` by default. If your database has a different name, update the `DATABASE` variable in `api.py`.
+The API is configured to use a SQLite database file named `workstat.db` by default. If your database has a different name, update the `DATABASE` variable in `main.py`.
 
 ## Running the API Server
 
 To start the API server, navigate to the `workstat/src` directory and run:
 
 ```bash
-python api.py
+python main.py
 ```
 
 This will start a development server on `http://localhost:5000`.
@@ -42,7 +42,8 @@ This provides a user-friendly form to submit new work items.
   {
     "uname_o": "original_username",
     "uname_u": "upstream_username",
-    "tdiff": 123
+    "tdiff": 123,
+    "sec": "secret_value"
   }
   ```
 
@@ -79,7 +80,7 @@ This provides a user-friendly form to submit new work items.
 ```bash
 curl -X POST http://localhost:5000/api/work-insert \
   -H "Content-Type: application/json" \
-  -d '{"uname_o": "user1", "uname_u": "upstream1", "tdiff": 100}'
+  -d '{"uname_o": "user1", "uname_u": "upstream1", "tdiff": 100, "sec": "secret_value"}'
 ```
 
 ### Using Python requests
