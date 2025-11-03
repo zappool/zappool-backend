@@ -24,7 +24,7 @@ mv ./data/_new_workstat.db ./data/workstat.db
 ## Startup
 
 ```
-./venv/bin/python workstat/src/api.py
+./venv/bin/python workstat/src/main.py
 ```
 
 ## Test
@@ -32,7 +32,7 @@ mv ./data/_new_workstat.db ./data/workstat.db
 ```
 curl http://localhost:5004/api/ping -H "Content-Type: application/json"
 curl http://localhost:5004/api/work-count -H "Content-Type: application/json"
-curl -X POST http://localhost:5004/api/work-insert -H "Content-Type: application/json" -d '{"uname_o": "user1", "uname_u": "upstream1", "tdiff": 100}'
+curl -X POST http://localhost:5004/api/work-insert -H "Content-Type: application/json" -d '{"uname_o": "user1", "uname_u": "upstream1", "tdiff": 100, "sec": "secret_value"}'
 
 ./venv/bin/python workstat/src/main_list.py
 ./venv/bin/python workstat/src/main_test.py
