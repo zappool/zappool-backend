@@ -1,5 +1,6 @@
 .vscode
 data
+backup
 _new*.db
 .env
 venv
