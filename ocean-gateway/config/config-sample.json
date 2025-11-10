@@ -33,6 +33,7 @@
         },
         "proxypool": {
                 "upstream_username": "bc1q98wufxmtfh5qlk7fe5dzy2z8cflvqjysrh4fx2",
-                "workstat_api_url": "http://localhost:5004/api/"
+                "workstat_api_url": "http://localhost:5004/api/",
+                "workstat_secret": "secret"
         }
 }
