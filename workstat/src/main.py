@@ -270,5 +270,45 @@ def get_count():
         return jsonify({"error": str(e)}), 500
 
 
+# URL parameter:
+# - start_id: Start after this ID,exclusive
+# - start_time: Start at this time, inclusive
+# - limit: Optional, limit the number of entries returned (0=unlimited)
+@app.route('/api/get-work-after-id', methods=['GET'])
+def get_work_after_id():
+    try:
+        print(f"Received get-count")
+
+        try:
+            start_id = int(request.args.get('start_id'))
+        except:
+            raise Exception(f"Missing numeric 'start_id' parameter!")
+        if start_id is None or start_id == 0:
+            raise Exception(f"Invalid 'start_id' parameter '{start_id}'!")
+        try:
+            start_time = int(request.args.get('start_time'))
+        except:
+            raise Exception(f"Missing numeric 'start_time' parameter!")
+        if start_time is None or start_time == 0:
+            raise Exception(f"Invalid 'start_id' parameter '{start_time}'!")
+        limit = 0
+        try:
+            limit = int(request.args.get('limit'))
+        except:
+            limit = 0
+
+        conn = get_db_connection(readonly=True)
+        cursor = conn.cursor()
+        work_list = db_ws.get_work_after_id(cursor, start_id, start_time, limit)
+        cursor.close()
+        conn.close()
+
+        asjson = list(map(lambda w: w.__dict__, work_list))
+        return jsonify(asjson), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=False, port=5004)
