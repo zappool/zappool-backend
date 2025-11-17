@@ -1,0 +1,25 @@
+name: MainCI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up Python
+      run: sudo apt-get install python3
+    - uses: actions/checkout@v4
+    # - name: Set up a Python virtual environment (needed for maturin)
+    #   run: python3 -m venv ./venv
+    - name: Install Python deps
+      run: pip3 install -r ./workstat/requirements.txt
+
