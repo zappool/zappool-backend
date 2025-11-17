@@ -150,8 +150,8 @@ def insert_work(conn, uname_o: str, uname_u: str, tdiff: int):
     return insert_work_struct(conn, work)
 
 
-def get_all_work_limit(cursor) -> list[Work]:
-    cursor.execute("""
+def get_all_work_limit(cursor, limit = 0) -> list[Work]:
+    query_str = """
         SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout
         FROM WORK
         LEFT OUTER JOIN ORUSER
@@ -159,8 +159,11 @@ def get_all_work_limit(cursor) -> list[Work]:
         LEFT OUTER JOIN USUSER
         ON WORK.UNameU = USUSER.Id
         ORDER BY WORK.TimeAdd DESC
-        LIMIT 1000
-    """)
+    """
+    if limit == 0:
+        cursor.execute(query_str, ())
+    else:
+        cursor.execute(query_str + " LIMIT ?", (limit,))
     rows = cursor.fetchall()
     res = []
     for row in rows:
@@ -170,8 +173,11 @@ def get_all_work_limit(cursor) -> list[Work]:
     return res
 
 
-def get_work_after_id(cursor, start_id: int, start_time: int) -> list[Work]:
-    cursor.execute("""
+# - start_id: Start after this ID,exclusive
+# - start_time: Start at this time, inclusive
+# - limit: Optional, limit the number of entries returned (0=unlimited)
+def get_work_after_id(cursor, start_id: int, start_time: int, limit: int = 0) -> list[Work]:
+    query_str = """
         SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout
         FROM WORK
         LEFT OUTER JOIN ORUSER
@@ -180,7 +186,11 @@ def get_work_after_id(cursor, start_id: int, start_time: int) -> list[Work]:
         ON WORK.UNameU = USUSER.Id
         WHERE WORK.Id > ? AND WORK.TimeAdd >= ?
         ORDER BY WORK.Id ASC
-    """, (start_id, start_time,))
+    """
+    if limit == 0:
+        cursor.execute(query_str, (start_id, start_time))
+    else:
+        cursor.execute(query_str + " LIMIT ?", (start_id, start_time, limit))
     rows = cursor.fetchall()
     res = []
     for row in rows:

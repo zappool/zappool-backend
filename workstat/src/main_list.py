@@ -14,7 +14,7 @@ conn = sqlite3.connect(dbfile_uri_ro, uri=True)
 
 # Fetch and display records
 cursor = conn.cursor()
-res = db.get_all_work_limit(cursor)
+res = db.get_all_work_limit(cursor, 100)
 
 print(f"({len(res)}):")
 for w in res:
