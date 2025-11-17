@@ -1,0 +1,23 @@
+name: Build Datum
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Install build tools
+      run: sudo apt-get install cmake pkgconf libcurl4-openssl-dev libjansson-dev libsodium-dev libmicrohttpd-dev psmisc
+    - uses: actions/checkout@v4
+    - name: Prepare sources & Compile Datum
+      run: cd ocean-gateway && ./setup_datum_gateway.sh
+
