@@ -21,7 +21,7 @@ class Work:
         calc_payout = 0
         return Work(0, uname_o, uname_o_wrkr, uname_u, uname_u_wrkr, tdiff, time_add, time_calc, calc_payout)
 
-    def split_username_worker(full_username: str) -> (str, str):
+    def split_username_worker(full_username: str) -> tuple[str, str]:
         dotindex = full_username.find(".")
         if dotindex < 0:
             return (full_username, "")

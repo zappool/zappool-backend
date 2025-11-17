@@ -1,4 +1,4 @@
-from db_ws import insert_work, get_work_count
+import db_ws
 
 import sys
 sys.path.insert(1, "common")
@@ -9,6 +9,7 @@ from flask import Flask, request, jsonify, render_template_string
 import sqlite3
 import os
 import sys
+
 
 dotenv.load_dotenv()
 API_SECRET = os.getenv("WORKSTAT_SECRET")
@@ -193,7 +194,7 @@ def add_work():
         # Insert work item into database
         try:
             conn = get_db_connection(readonly=False)
-            insert_work(conn, uname_o, uname_u, tdiff)
+            db_ws.insert_work(conn, uname_o, uname_u, tdiff)
             conn.close()
         except Exception as e:
             return jsonify({"error": f"Error inserting {str(e)}"}), 500
@@ -237,7 +238,7 @@ def add_work_form():
         
         # Insert work item into database
         conn = get_db_connection(readonly=False)
-        insert_work(conn, uname_o, uname_u, tdiff)
+        db_ws.insert_work(conn, uname_o, uname_u, tdiff)
         conn.close()
         
         return render_template_string(
@@ -251,6 +252,7 @@ def add_work_form():
             error=f"An error occurred: {str(e)}"
         )
 
+
 @app.route('/api/work-count', methods=['GET'])
 def get_count():
     try:
@@ -258,7 +260,7 @@ def get_count():
 
         conn = get_db_connection(readonly=True)
         cursor = conn.cursor()
-        cnt = get_work_count(cursor)
+        cnt = db_ws.get_work_count(cursor)
         cursor.close()
         conn.close()
 
@@ -266,6 +268,7 @@ def get_count():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=False, port=5004)
