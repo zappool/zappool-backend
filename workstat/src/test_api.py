@@ -34,6 +34,8 @@ class WorkstatApiTestClass(unittest.TestCase):
         # print(f"DB_DIR: {os.getenv("DB_DIR")}")
         # cls.assertEqual(os.getenv("DB_DIR"), "/tmp")
 
+        cls.recreate_db(cls)
+
         _th = _thread.start_new(run_api_server, (app,))
         time.sleep(0.05)
 
@@ -50,7 +52,8 @@ class WorkstatApiTestClass(unittest.TestCase):
 
     def recreate_db(self):
         print(f"Temp DB used: {self.dbfile}")
-        os.remove(self.dbfile)
+        if os.path.isfile(self.dbfile):
+            os.remove(self.dbfile)
         conn = sqlite3.connect(self.dbfile)
         db_ws.db_setup_1(conn)
         conn.close()
