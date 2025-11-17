@@ -11,18 +11,29 @@ import os
 import sys
 
 
-dotenv.load_dotenv()
-API_SECRET = os.getenv("WORKSTAT_SECRET")
-if not API_SECRET or len(API_SECRET) < 2:
-    print(f"Error: API_SECRET is unset or too weak '{API_SECRET}'")
-    sys.exit(-1)
-print(f"Using Api secret, len {len(API_SECRET)}")
-
 app = Flask(__name__)
 
 # Database configuration
 DATABASE = "workstat.db"  # Database filename (adjust if needed)
-dbfile = get_db_file(DATABASE)
+dbfile = None
+API_SECRET="?"
+
+def init_app():
+    # Your initialization code goes here
+    dotenv.load_dotenv()
+
+    global dbfile
+    dbfile = get_db_file(DATABASE)
+    print(f"Using dbfile: '{dbfile}'")
+
+    global API_SECRET
+    API_SECRET = os.getenv("WORKSTAT_SECRET")
+    if not API_SECRET or len(API_SECRET) < 2:
+        print(f"Error: API_SECRET is unset or too weak '{API_SECRET}'")
+        sys.exit(-1)
+    print(f"Using Api secret, {len(API_SECRET)}")
+
+    print(f"App initialized")
 
 def get_db_connection(readonly: bool):
     """Create a connection to the SQLite database."""
@@ -160,7 +171,7 @@ def add_work():
     try:
         # Get JSON data from request
         data = request.get_json()
-        
+
         # Validate required fields
         if not data:
             return jsonify({"error": "No data provided"}), 400
@@ -290,7 +301,7 @@ def get_work_after_id():
         except:
             raise Exception(f"Missing numeric 'start_time' parameter!")
         if start_time is None or start_time == 0:
-            raise Exception(f"Invalid 'start_id' parameter '{start_time}'!")
+            raise Exception(f"Invalid 'start_time' parameter '{start_time}'!")
         limit = 0
         try:
             limit = int(request.args.get('limit'))
@@ -311,4 +322,5 @@ def get_work_after_id():
 
 
 if __name__ == '__main__':
+    init_app()
     app.run(debug=False, port=5004)

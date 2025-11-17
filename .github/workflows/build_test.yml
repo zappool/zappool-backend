@@ -22,4 +22,7 @@ jobs:
     #   run: python3 -m venv ./venv
     - name: Install Python deps
       run: pip3 install -r ./workstat/requirements.txt
+    - name: Run unit tests
+      run: |
+        python3 ./workstat/src/test_api.py
 
