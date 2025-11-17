@@ -20,4 +20,6 @@ jobs:
     - uses: actions/checkout@v4
     - name: Prepare sources & Compile Datum
       run: cd ocean-gateway && ./setup_datum_gateway.sh
+    - name: List result binary
+      run: ls -l ocean-gateway/datum_gateway/datum_gateway
 
