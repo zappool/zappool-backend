@@ -89,10 +89,10 @@ def get_block_earnings(ocean_address: str) -> list[BlockEarning]:
                 # print(words[0])
                 time = int(datetime.fromisoformat(words[0]).replace(tzinfo=UTC).timestamp())
                 # print(time.timestamp(), time)
-                earned_sats = int(float(words[4]) * 100_000_000)
+                earned_sats = round(float(words[4]) * 100_000_000)
                 pool_fee = 0
                 if len(words) >= 6:
-                    pool_fee = int(float(words[5]) * 100_000_000)
+                    pool_fee = round(float(words[5]) * 100_000_000)
                 earn_obj = BlockEarning(time, words[1], earned_sats, pool_fee)
                 # print(f"{earn_obj.to_string()}")
                 arr.append(earn_obj)
