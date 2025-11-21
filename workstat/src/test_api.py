@@ -3,9 +3,7 @@ from main import app, init_app
 
 import sys
 sys.path.insert(1, "common")
-from common_main import get_db_file
 
-from flask import Flask, request, jsonify, render_template_string
 import dotenv
 import requests
 import os
@@ -38,17 +36,6 @@ class WorkstatApiTestClass(unittest.TestCase):
 
         _th = _thread.start_new(run_api_server, (app,))
         time.sleep(0.05)
-
-    # def setUp(self):
-    #     print("setUp")
-        # self.url_root = "http://localhost:8000/api"
-        # self.dbfile = "/tmp/workstat.db"
-
-        # dotenv.load_dotenv()
-        # # print(f"DB_DIR: {os.getenv("DB_DIR")}")
-        # self.assertEqual(os.getenv("DB_DIR"), "/tmp")
-
-        # self.recreate_db()
 
     def recreate_db(self):
         print(f"Temp DB used: {self.dbfile}")
