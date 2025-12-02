@@ -36,8 +36,11 @@ def init_app():
     print(f"App initialized")
 
 def get_db_connection(readonly: bool):
-    """Create a connection to the SQLite database."""
     global dbfile
+    if dbfile is None:
+        dbfile = get_db_file(DATABASE)
+
+    """Create a connection to the SQLite database."""
     if readonly:
         dbfile_uri_ro = "file:" + dbfile + "?mode=ro"
         # print(dbfile_uri_ro)
@@ -288,7 +291,7 @@ def get_count():
 @app.route('/api/get-work-after-id', methods=['GET'])
 def get_work_after_id():
     try:
-        print(f"Received get-count")
+        # print(f"Received get-work-after-id")
 
         try:
             start_id = int(request.args.get('start_id'))
