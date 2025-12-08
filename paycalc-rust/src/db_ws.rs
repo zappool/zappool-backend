@@ -76,9 +76,6 @@ pub fn get_work_count(conn: &Connection) -> Result<u32, Box<dyn Error>> {
 mod tests {
     use super::*;
     use rusqlite::Connection;
-    // use std::fs;
-
-    // const TEST_DB_FILENAME: &str = "/tmp/test_workstat.db";
 
     fn db_setup_1(conn: &Connection) -> Result<(), Box<dyn Error>> {
         // Create table ORUser  (ORiginal User)
