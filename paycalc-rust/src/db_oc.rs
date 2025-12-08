@@ -11,9 +11,8 @@ fn blockearning_from_row(row: &Row) -> Result<BlockEarning, rusqlite::Error> {
         row.get::<_, String>(1)?,
         row.get(2)?,
         row.get(3)?,
-        row.get(4)?,
     );
-    // println!("blockearning_from_row {0}", w.db_id);
+    // println!("blockearning_from_row {0}", w.block_hash);
     Ok(w)
 }
 
@@ -21,7 +20,7 @@ pub fn get_new_blocks(conn: &Connection, old_time: u32) -> Result<Vec<BlockEarni
     let query_str =
         "SELECT Time, BlockHash, Earning, PoolFee, TimeAddedFirst, TimeUpdated \
         FROM OC_BLOCK_EARN \
-        WHERE Time >= ?1 \
+        WHERE Time > ?1 \
         ORDER BY Time ASC ";
 
     let mut stmt = conn.prepare(query_str)?;
