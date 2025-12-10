@@ -91,9 +91,17 @@ mod tests {
             let count = get_new_blocks(&connection, 1050)?;
             assert_eq!(count.iter().len(), 1);
         }
-        { // ID rigth on the limit
-            let count = get_new_blocks(&connection, 1001)?;
+        { // ID just below a block
+            let count = get_new_blocks(&connection, 1000)?;
             assert_eq!(count.iter().len(), 2);
+        }
+        { // ID just at a block
+            let count = get_new_blocks(&connection, 1001)?;
+            assert_eq!(count.iter().len(), 1);
+        }
+        { // ID just after a block
+            let count = get_new_blocks(&connection, 1002)?;
+            assert_eq!(count.iter().len(), 1);
         }
 
         Ok(())
