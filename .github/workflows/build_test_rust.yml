@@ -1,0 +1,25 @@
+name: Build and test Rust
+
+on:
+  push:
+    branches: [ "main", "paycalc-rust" ]
+  pull_request:
+    branches: [ "main", "paycalc-rust" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up Rust
+      run: sudo apt-get install cargo && rustup override set 1.85
+    - uses: actions/checkout@v4
+    - name: Build Rust
+      run: cd paycalc-rust && cargo build
+    - name: Run unit tests
+      run: cd paycalc-rust && cargo test
+
