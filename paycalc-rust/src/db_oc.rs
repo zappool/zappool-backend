@@ -37,8 +37,8 @@ pub fn count_new_blocks(conn: &Connection, old_time: u32) -> Result<u32, Box<dyn
     )?;
 
     let res = stmt.query_one([old_time], |row| {
-        Ok(row.get::<_, u32>(0))
-    })??;
+        row.get::<_, u32>(0)
+    })?;
     Ok(res)
 }
 

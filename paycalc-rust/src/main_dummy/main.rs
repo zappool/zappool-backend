@@ -1,10 +1,5 @@
-mod db_oc;
-mod db_ws;
-mod dto_oc;
-mod dto_ws;
-
-use crate::db_ws::{get_work_count, get_work_after_id};
-use crate::db_oc::{get_new_blocks, count_new_blocks};
+use paycalc_rust::db_ws::{get_work_count, get_work_after_id};
+use paycalc_rust::db_oc::{get_new_blocks, count_new_blocks};
 
 use rusqlite::Connection;
 use std::env;
@@ -12,8 +7,8 @@ use std::error::Error;
 use std::thread;
 use std::time::Duration;
 
-fn main() -> Result<(), Box<dyn Error>>{
-// Load environment variables from .env file
+fn main() -> Result<(), Box<dyn Error>> {
+    // Load environment variables from .env file
     dotenv::dotenv().ok();
 
     // Read DB_DIR from environment variables
