@@ -8,8 +8,8 @@ dotenv = "0.15.0"
 rusqlite = "0.37.0"
 
 [[bin]]
-name = "main_dummy"
-path = "src/main_dummy/main.rs"
+name = "main"
+path = "src/main/main.rs"
 
 [[bin]]
 name = "__setup_db"
@@ -19,7 +19,7 @@ path = "src/__setup_db/main.rs"
 name = "main_list_work"
 path = "src/main_list_work/main.rs"
 
-[main_dummy.dependencies]
+[main.dependencies]
 paycalc_rust = 0.1
 
 [__setub_db.dependencies]
