@@ -62,7 +62,7 @@ pub fn get_db_update_versions_from_args(default_to: u8) -> (u8, u8) {
 }
 
 fn get_current_db_version(dbfile: &str) -> Result<u8, Box<dyn Error>> {
-    let mut conn = Connection::open_with_flags(dbfile, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let conn = Connection::open_with_flags(dbfile, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let mut stmt = conn.prepare("SELECT Version FROM VERSION LIMIT 1")?;
     let version = stmt.query_one([], |row| {
         row.get::<_, u8>(0)

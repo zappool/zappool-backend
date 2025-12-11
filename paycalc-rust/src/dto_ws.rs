@@ -39,5 +39,8 @@ impl Work {
     }
 
     pub fn db_id(&self) -> u32 { self.db_id }
+    pub fn uname_o(&self) -> &String { &self.uname_o }
+    pub fn uname_o_wrkr(&self) -> &String { &self.uname_o_wrkr }
+    pub fn tdiff(&self) -> u32 { self.tdiff }
     pub fn time_add(&self) -> f32 { self.time_add }
 }

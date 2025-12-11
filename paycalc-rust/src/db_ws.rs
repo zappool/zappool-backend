@@ -24,7 +24,7 @@ fn work_from_row(row: &Row) -> Result<Work, rusqlite::Error> {
 /// - start_id: Start after this ID,exclusive
 /// - start_time: Start at this time, inclusive
 /// - limit: limit the number of entries returned (0=unlimited)
-pub fn get_work_after_id(conn: &Connection, start_id: u32, start_time: u32, limit: u32) -> Result<Vec<Work>, Box<dyn Error>> {
+pub fn get_work_after_id(conn: &Connection, start_id: i32, start_time: u32, limit: u32) -> Result<Vec<Work>, Box<dyn Error>> {
     let query_str =
         "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout \
         FROM WORK \

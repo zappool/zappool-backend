@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let workitems = get_work_after_id(&conn_ws, last_work_id, last_work_time, 0)?;
         if workitems.len() > 0 {
             let last_item = &workitems[workitems.len() - 1];
-            last_work_id = last_item.db_id();
+            last_work_id = last_item.db_id() as i32;
             last_work_time = last_item.time_add() as u32;
             println!("Got {} workitems,  last: {} {}", workitems.len(), last_work_id, last_work_time);
         }
@@ -52,5 +52,5 @@ fn main() -> Result<(), Box<dyn Error>> {
             thread::sleep(Duration::from_secs(3));
         }
     }
-    Ok(())
+    // Ok(())
 }
