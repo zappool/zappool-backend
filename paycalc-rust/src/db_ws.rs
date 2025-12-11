@@ -129,43 +129,39 @@ mod tests {
     // }
 
     #[test]
-    fn test_get_work_count() -> Result<(), Box<dyn Error>> {
-        let connection = Connection::open_in_memory()?;
-        create_test_db(&connection)?;
+    fn test_get_work_count() {
+        let conn = Connection::open_in_memory().unwrap();
+        create_test_db(&conn).unwrap();
 
         // Test our function
-        let count = get_work_count(&connection)?;
+        let count = get_work_count(&conn).unwrap();
         assert_eq!(count, 5);
 
         // delete_test_db()?;
-
-        Ok(())
     }
 
     #[test]
-    fn test_get_work_after_id() -> Result<(), Box<dyn Error>> {
-        let connection = Connection::open_in_memory()?;
-        create_test_db(&connection)?;
+    fn test_get_work_after_id() {
+        let conn = Connection::open_in_memory().unwrap();
+        create_test_db(&conn).unwrap();
 
         { // all
-            let count = get_work_after_id(&connection, 0, 1, 0)?;
+            let count = get_work_after_id(&conn, 0, 1, 0).unwrap();
             assert_eq!(count.iter().len(), 5);
         }
         { // later ID
-            let count = get_work_after_id(&connection, 2, 1, 0)?;
+            let count = get_work_after_id(&conn, 2, 1, 0).unwrap();
             assert_eq!(count.iter().len(), 3);
         }
         { // later time
-            let count = get_work_after_id(&connection, 0, 1_002_500, 0)?;
+            let count = get_work_after_id(&conn, 0, 1_002_500, 0).unwrap();
             assert_eq!(count.iter().len(), 2);
         }
         { // limit
-            let count = get_work_after_id(&connection, 0, 1, 2)?;
+            let count = get_work_after_id(&conn, 0, 1, 2).unwrap();
             assert_eq!(count.iter().len(), 2);
         }
 
         // delete_test_db()?;
-
-        Ok(())
     }
 }
