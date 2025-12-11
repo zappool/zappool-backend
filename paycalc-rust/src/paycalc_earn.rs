@@ -1,27 +1,35 @@
 use rusqlite::Connection;
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::env;
+use std::error::Error;
 use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-pub fn loop_iterations(_conn: &Connection, _conn_workstat_ro: &Connection, _conn_oceanmgr_ro: &Connection) {
-    // TODO
+fn iteration(_conn: &Connection, _conn_workstat_ro: &Connection, _conn_oceanmgr_ro: &Connection)  -> Result<(), Box<dyn Error>> {
+    println!("TODO!!!!!");
+    Ok(())
+}
 
+pub fn loop_iterations(conn: &Connection, conn_workstat_ro: &Connection, conn_oceanmgr_ro: &Connection) {
     // global birth_time
-    // birth_time = int(os.getenv("PAYCALC_BIRTH_TIME", 0))
+    let birth_time = env::var("PAYCALC_BIRTH_TIME").unwrap_or("0".to_string()).parse::<u32>().unwrap_or(0);
 
     println!("Paycalc/main: loop starting...");
-    // if birth_time > 0:
-    //     print(f"Birth time: {birth_time}")
+    if birth_time > 0 {
+        println!("Birth time: {birth_time}");
+    }
 
     let sleep_secs: f64 = 5.0;
     let mut next_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs_f64();
 
     loop {
-        // try:
-        //     iteration(conn, conn_workstat_ro, conn_oceanmgr_ro)
-        // except Exception as ex:
-        //     print(f"ERROR in iteration, {str(ex)}")
-        //     continue
+        match iteration(conn, conn_workstat_ro, conn_oceanmgr_ro) {
+            Ok(_) => {}
+            Err(err) => {
+                println!("ERROR in iteration, {}", err.to_string());
+                continue;
+            }
+        }
 
         next_time = next_time + sleep_secs;
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs_f64();
