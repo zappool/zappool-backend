@@ -21,9 +21,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let conn_oceanmgr_ro = Connection::open_with_flags(dbfile_oceanmgr, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
 
     let dbfile = get_db_file("paycalc.db", false);
-    let conn = Connection::open(&dbfile)?;
+    let mut conn = Connection::open(&dbfile)?;
 
-    loop_iterations(&conn, &conn_workstat_ro, &conn_oceanmgr_ro);
+    // TODO
+    // # Start Payreq loop in background
+    // payreq_thread = Thread(target=payreq_loop_iterations, name="payreq")
+    // payreq_thread.start()
+
+    // # Start payment loop in background
+    // payer_thread = Thread(target=payer_loop_iterations, name="payer")
+    // payer_thread.start()
+
+    loop_iterations(&mut conn, &conn_workstat_ro, &conn_oceanmgr_ro);
 
     Ok(())
 }

@@ -26,7 +26,7 @@ fn print_workitem_status(conn: &Connection, last_workitem_retrvd: i32) {
     let newworkitems = get_work_after_id(&conn, last_workitem_retrvd, 0, 0).unwrap();
     println!("Workitems after ID {} are: ({} pcs):", last_workitem_retrvd, newworkitems.len());
     for wi in newworkitems {
-        println!("  {} {} {}{}", wi.db_id(), wi.tdiff(), wi.uname_o(), wi.uname_o_wrkr());
+        println!("  {} {} {}{}", wi.db_id, wi.tdiff, wi.uname_o, wi.uname_o_wrkr);
     }
 }
 

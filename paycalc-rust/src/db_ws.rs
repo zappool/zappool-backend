@@ -8,10 +8,10 @@ fn work_from_row(row: &Row) -> Result<Work, rusqlite::Error> {
     // println!("work_From_row {0:?}", row);
     let w = Work::new(
         row.get(0)?,
-        &row.get::<_, String>(1)?,
-        &row.get::<_, String>(2)?,
-        &row.get::<_, String>(3)?,
-        &row.get::<_, String>(4)?,
+        row.get::<_, String>(1)?,
+        row.get::<_, String>(2)?,
+        row.get::<_, String>(3)?,
+        row.get::<_, String>(4)?,
         row.get(5)?,
         row.get(6)?,
         row.get(7)?,
