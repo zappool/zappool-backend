@@ -24,7 +24,7 @@ pub fn get_new_blocks(conn: &Connection, old_time: u32) -> Result<Vec<BlockEarni
         ORDER BY Time ASC ";
 
     let mut stmt = conn.prepare(query_str)?;
-    let vector = stmt.query_map([old_time], |row| blockearning_from_row(row))?
+    let vector = stmt.query_map((old_time,), |row| blockearning_from_row(row))?
         .filter(|ber| ber.is_ok())
         .map(|ber| ber.unwrap())
         .collect::<Vec<BlockEarning>>();
@@ -35,8 +35,7 @@ pub fn count_new_blocks(conn: &Connection, old_time: u32) -> Result<u32, Box<dyn
     let mut stmt = conn.prepare(
         "SELECT COUNT(*) FROM OC_BLOCK_EARN WHERE Time > ?"
     )?;
-
-    let res = stmt.query_one([old_time], |row| {
+    let res = stmt.query_one((old_time,), |row| {
         row.get::<_, u32>(0)
     })?;
     Ok(res)

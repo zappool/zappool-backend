@@ -1,7 +1,7 @@
 use crate::common::get_db_update_versions_from_args;
-use crate::dto_pc::Work;
+use crate::dto_pc::{Block, Work};
 
-use rusqlite::{Connection, Transaction};
+use rusqlite::{Connection, Row, Transaction};
 use std::error::Error;
 
 // static BLOCKS_WINDOW: u8 = 8;
@@ -219,24 +219,36 @@ pub fn get_status(conn: &Connection) -> Result<(i32, u32, u32, i32, u32), Box<dy
     Ok(res)
 }
 
+fn block_from_row(row: &Row) -> Result<Block, rusqlite::Error> {
+    // println!("block_from_row {0:?}", row);
+    let b = Block::new(
+        row.get::<_, u32>(0)?,
+        row.get::<_, String>(1)?,
+        row.get::<_, u64>(2)?,
+        row.get::<_, u32>(3)?,
+        row.get::<_, u64>(4)?,
+    );
+    // println!("block_from_row {0}", b.block_hash);
+    Ok(b)
+}
+
 // Doesn't commit
-pub fn set_status_last_workitem_retrvd(tx: &Transaction, newval: i32, new_time_val: u32) -> Result<(), Box<dyn Error>> {
-    let _ = tx.execute(
-        "UPDATE STATUS \
-            SET LastWorkItemRetrvd = ?1, LastWorkItemTimeRetrvd = ?2",
+pub fn set_status_last_workitem_retrvd(conntx: &Transaction, newval: i32, new_time_val: u32) -> Result<(), Box<dyn Error>> {
+    let _ = conntx.execute(
+        "UPDATE STATUS SET LastWorkItemRetrvd = ?1, LastWorkItemTimeRetrvd = ?2",
         [newval, new_time_val as i32])?;
     Ok(())
 }
 
+// Doesn't commit
+pub fn set_status_last_block_retrvd(conntx: &Transaction, newval: u32) -> Result<(), Box<dyn Error>> {
+    let _ = conntx.execute(
+        "UPDATE STATUS SET LastBlockRetrvd = ?1",
+        (newval,))?;
+    Ok(())
+}
+
 /*
-# Doesn't commit
-def set_status_last_block_retrvd(cursor: sqlite3.Cursor, newval: int):
-    cursor.execute("""
-        UPDATE STATUS
-        SET LastBlockRetrvd = ?
-    """, (newval,))
-
-
 # Doesn't commit
 def set_status_last_block_procd(cursor: sqlite3.Cursor, newval: int):
     cursor.execute("""
@@ -363,32 +375,27 @@ def get_work_count(cursor: sqlite3.Cursor) -> int:
                 cnt = rows[0][0]
     # print(cnt)
     return cnt
+*/
 
+pub fn work_get_total_committed(conn: &Connection) -> Result<u64, Box<dyn Error>> {
+    let mut stmt = conn.prepare("SELECT SUM(Committed) FROM WORK")?;
+    let sum = stmt.query_one((), |row| {
+        row.get::<_, u64>(0)
+    })?;
+    // println!("work_get_total_committed {sum}");
+    Ok(sum)
+}
 
-def work_get_total_committed(cursor: sqlite3.Cursor) -> int:
-    cursor.execute("SELECT SUM(Committed) FROM WORK")
-    rows = cursor.fetchall()
-    sum = 0
-    if len(rows) >= 1:
-        if len(rows[0]) >= 1:
-            if rows[0][0] != None:
-                sum = rows[0][0]
-    # print(f"work_get_total_committed {sum}")
-    return sum
+pub fn work_get_total_estimated(conn: &Connection) -> Result<u64, Box<dyn Error>> {
+    let mut stmt = conn.prepare("SELECT SUM(Estimate) FROM WORK")?;
+    let sum = stmt.query_one((), |row| {
+        row.get::<_, u64>(0)
+    })?;
+    // println!("{sum}")
+    Ok(sum)
+}
 
-
-def work_get_total_estimated(cursor: sqlite3.Cursor) -> int:
-    cursor.execute("SELECT SUM(Estimate) FROM WORK")
-    rows = cursor.fetchall()
-    sum = 0
-    if len(rows) >= 1:
-        if len(rows[0]) >= 1:
-            if rows[0][0] != None:
-                sum = rows[0][0]
-    # print(sum)
-    return sum
-
-
+/*
 def work_get_user_total_committed(cursor: sqlite3.Cursor, user_o_id: int) -> int:
     cursor.execute("SELECT SUM(Committed) FROM WORK WHERE UNameO == ?", (user_o_id,))
     rows = cursor.fetchall()
@@ -632,101 +639,94 @@ def work_device_count_user_period(cursor: sqlite3.Cursor, user_id: str, start_ti
             if rows[0][0] != None:
                 cnt = rows[0][0]
     return cnt
+*/
+
+// Get the blocks after a certain time, oldest first.
+// Old time is typically the time of the already processed last block.
+pub fn block_get_new_blocks(conn: &Connection, old_time: u32) -> Result<Vec<Block>, Box<dyn Error>> {
+    let mut stmt = conn.prepare(
+        "SELECT \
+            Time, BlockHash, Earning, PoolFee, AccTotalDiff \
+            FROM PC_BLOCK \
+            WHERE Time > ?1 \
+            ORDER BY Time ASC")?;
+    let vector = stmt.query_map((old_time,), |row| block_from_row(row))?
+        .filter(|blr| blr.is_ok())
+        .map(|blr| blr.unwrap())
+        .collect::<Vec<Block>>();
+    Ok(vector)
+}
+
+pub fn block_get_total_earn(conn: &Connection) -> Result<u64, Box<dyn Error>> {
+    let mut stmt = conn.prepare("SELECT SUM(Earning) FROM PC_BLOCK")?;
+    let sum = stmt.query_one((), |row| {
+        row.get::<_, u64>(0)
+    })?;
+    Ok(sum)
+}
+
+pub fn block_get_total_earned(conn: &Connection) -> Result<u64, Box<dyn Error>> {
+    let mut stmt = conn.prepare("SELECT SUM(Earning) FROM PC_BLOCK")?;
+
+    let res = stmt.query_one((), |row| {
+        row.get::<_, u64>(0)
+    })?;
+    Ok(res)
+}
+
+// Note: Doesn't commit
+pub fn block_insert(conntx: &Transaction, block: &Block, now: u32) -> Result<(), Box<dyn Error>> {
+    let _ = conntx.execute(
+        "INSERT INTO PC_BLOCK \
+            (Time, BlockHash, Earning, PoolFee, TimeAddedFirst, TimeUpdated, AccTotalDiff) \
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        (block.time, &block.block_hash, block.earned_sats, block.pool_fee, now, now, block.acc_total_diff))?;
+    // println!("inserted");
+    Ok(())
+}
+
+pub fn block_update_diff_no_commit(conn: &Connection, block_time: u32, new_acc_total_diff: u64) -> Result<(), Box<dyn Error>> {
+    let _ = conn.execute(
+        "UPDATE PC_BLOCK SET AccTotalDiff = ?1 WHERE Time = ?2",
+        (new_acc_total_diff, block_time))?;
+    Ok(())
+}
 
 
-# Get the blocks after a certain time, oldest first.
-# Old time is typically the time of the already processed last block.
-def block_get_new_blocks(cursor: sqlite3.Cursor, old_time: int) -> list[Block]:
-    cursor.execute("""
-        SELECT
-        Time, BlockHash, Earning, PoolFee, AccTotalDiff
-        FROM PC_BLOCK
-        WHERE Time > ?
-        ORDER BY Time ASC
-    """, (old_time,))
-    rows = cursor.fetchall()
-    res = []
-    for r in rows:
-        if len(r) >= 5:
-            res.append(Block(r[0], r[1], r[2], r[3], r[4]))
-    return res
+// Return the average earnings for the last N blocks.
+// Return a tuple: the sum of earnings and the sum of difficulties
+pub fn block_get_last_avg_n(conn: &Connection, last_block_count: u32) -> Result<(u64, u64), Box<dyn Error>> {
+    // First find the N most recent blocks
+    // Clamp to 3 -- 100
+    let count = std::cmp::max(std::cmp::min(last_block_count, 100), 3);
+    // let mut stmt QQQQ = cursor.execute(f"SELECT Time FROM PC_BLOCK ORDER BY Time DESC LIMIT {count}")
+    // rows = cursor.fetchall()
+    // if len(rows) == 0:
+    //     return [0, 0]
+    // lastrow = rows[len(rows) - 1]
+    // if len(lastrow) == 0:
+    //     return [0, 0]
+    // last_block_time = lastrow[0]
 
+    // cursor.execute("""
+    //     SELECT SUM(Earning), SUM(AccTotalDiff)
+    //     FROM PC_BLOCK
+    //     WHERE Time >= ?
+    // """, (last_block_time,))
+    // rows = cursor.fetchall()
+    // sum_e = 0
+    // sum_d = 0
+    // if len(rows) >= 1:
+    //     row = rows[0]
+    //     if len(row) >= 1:
+    //         sum_e = row[0]
+    //     if len(row) >= 2:
+    //         sum_d = row[1]
+    // return [sum_e, sum_d]
+    Err("TODO".into())
+}
 
-def block_get_total_earn(cursor: sqlite3.Cursor) -> int | None:
-    cursor.execute("SELECT SUM(Earning) FROM PC_BLOCK")
-    rows = cursor.fetchall()
-    if len(rows) >= 1:
-        r = rows[0]
-        if len(r) >= 1:
-            if r[0] != None:
-                return int(r[0])
-    return None
-
-
-def block_get_total_earned(cursor: sqlite3.Cursor) -> int:
-    cursor.execute("SELECT SUM(Earning) FROM PC_BLOCK")
-    rows = cursor.fetchall()
-    sum = 0
-    if len(rows) >= 1:
-        if len(rows[0]) >= 1:
-            if rows[0][0] != None:
-                sum = rows[0][0]
-    # print(sum)
-    return sum
-
-
-# Note: Doesn't commit
-def block_insert(cursor, block: Block, now: datetime):
-    cursor.execute("""
-        INSERT INTO PC_BLOCK
-        (Time, BlockHash, Earning, PoolFee, TimeAddedFirst, TimeUpdated, AccTotalDiff)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (block.time, block.block_hash, block.earned_sats, block.pool_fee, now, now, block.acc_total_diff))
-    # print("inserted")
-
-
-def block_update_diff_no_commit(cursor: sqlite3.Cursor, block_time: int, new_acc_total_diff: int):
-    cursor.execute("""
-        UPDATE PC_BLOCK
-        SET AccTotalDiff = ?
-        WHERE Time = ?
-    """, (new_acc_total_diff, block_time,))
-    cursor.fetchall()
-
-
-# Return the average earnings for the last N blocks.
-# Return a tuple: the sum of earnings and the sum of difficulties
-def block_get_last_avg_N(con: sqlite3.Connection, last_block_count: int) -> tuple[int, int]:
-    # First find the N most recent blocks
-    # Clamp to 3 -- 100
-    count = max(min(last_block_count, 100), 3)
-    cursor = con.cursor()
-    cursor.execute(f"SELECT Time FROM PC_BLOCK ORDER BY Time DESC LIMIT {count}")
-    rows = cursor.fetchall()
-    if len(rows) == 0:
-        return [0, 0]
-    lastrow = rows[len(rows) - 1]
-    if len(lastrow) == 0:
-        return [0, 0]
-    last_block_time = lastrow[0]
-
-    cursor.execute("""
-        SELECT SUM(Earning), SUM(AccTotalDiff)
-        FROM PC_BLOCK
-        WHERE Time >= ?
-    """, (last_block_time,))
-    rows = cursor.fetchall()
-    sum_e = 0
-    sum_d = 0
-    if len(rows) >= 1:
-        row = rows[0]
-        if len(row) >= 1:
-            sum_e = row[0]
-        if len(row) >= 2:
-            sum_d = row[1]
-    return [sum_e, sum_d]
-
-
+/*
 def miner_ss_exists(cursor: sqlite3.Cursor, id: int) -> bool:
     cursor.execute("SELECT UserId FROM MINER_SS WHERE UserId = ?", (id,))
     rows = cursor.fetchall()

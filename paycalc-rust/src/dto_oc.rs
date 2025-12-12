@@ -4,8 +4,8 @@ use std::u32;
 pub struct BlockEarning {
     pub time: u32,
     pub block_hash: String,
-    earned_sats: u64,
-    pool_fee: u32,
+    pub earned_sats: u64,
+    pub pool_fee: u32,
 }
 
 impl BlockEarning {

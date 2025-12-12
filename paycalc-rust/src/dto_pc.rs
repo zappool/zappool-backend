@@ -1,7 +1,7 @@
 use chrono::DateTime;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Work {
     pub db_id: u32,
     pub uname_o: String,
@@ -94,7 +94,7 @@ impl Work {
 }
 
 // Block earning: a piece of earned earning, connected to a block found
-struct Block {
+pub struct Block {
     pub time: u32,
     pub block_hash: String,
     pub earned_sats: u64,
