@@ -1,0 +1,30 @@
+[package]
+name = "paycalc-rust"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4.42"
+dotenv = "0.15.0"
+rusqlite = "0.37.0"
+
+[[bin]]
+name = "main"
+path = "src/main/main.rs"
+
+[[bin]]
+name = "__setup_db"
+path = "src/__setup_db/main.rs"
+
+[[bin]]
+name = "main_list_work"
+path = "src/main_list_work/main.rs"
+
+[main.dependencies]
+paycalc_rust = 0.1
+
+[__setub_db.dependencies]
+paycalc_rust = 0.1
+
+[main_list_work.dependencies]
+paycalc_rust = 0.1
