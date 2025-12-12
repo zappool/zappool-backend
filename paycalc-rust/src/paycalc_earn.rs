@@ -138,7 +138,7 @@ fn retrieve_new_workitems(conn_workitem_ro: &Connection, conn: &mut Connection, 
     let _ = db::set_status_last_workitem_retrvd(&conntx, new_last as i32, new_last_time)?;
 
     let _ = conntx.commit()?;
-    get_status_status(conn, status)?;
+    let _ = get_status_status(conn, status)?;
 
     println!(" ... retrieved {} work records, last id {} / {}", cnt, status.last_workitem_retrvd, status.last_workitem_time_retrvd);
     Ok(cnt)
@@ -183,7 +183,7 @@ fn retrieve_new_blocks(conn: &mut Connection, conn_oceanmgr_ro: &Connection, sta
     let _ = db::set_status_last_block_retrvd(&conntx, new_last)?;
 
     let _ = conntx.commit()?;
-    get_status_status(conn, status)?;
+    let _ = get_status_status(conn, status)?;
 
     println!(" ... retrieved {} blocks, last time {}", cnt, status.last_block_retrvd);
     Ok(cnt as u32)
@@ -193,69 +193,75 @@ fn retrieve_new_blocks(conn: &mut Connection, conn_oceanmgr_ro: &Connection, sta
 // Return:
 // - total (new) committed earnings accounted (msat)
 // - total diff of affected work items
-fn account_for_new_block(conn: &Connection, block_time: u32, new_earnings: u64, status: &Status, affected_user_ids: &mut HashSet<u32>) -> Result<(u64, u64), Box<dyn Error>> {
-    // global last_block_procd
-    // cursor = conn.cursor()
-    // tot_comm_pre = db.work_get_total_committed(cursor)
-    // print(f"Processing block {block_time}, {new_earnings}  {tot_comm_pre}")
+fn account_for_new_block(conn: &mut Connection, block_time: u32, new_earnings: u64, status: &mut Status, affected_user_ids: &mut HashSet<u32>) -> Result<(u64, u64), Box<dyn Error>> {
+    let tot_comm_pre = db::work_get_total_committed(conn)?;
+    println!("Processing block {block_time}, {new_earnings}  {tot_comm_pre}");
 
-    // work = db.work_get_affected_by_new_block(cursor, block_time)
-    // cursor.close()
+    let work = db::work_get_affected_by_new_block(conn, block_time)?;
 
-    // if len(work) == 0:
-    //     print("No workitems to update found!")
+    if work.len() == 0 {
+        println!("No workitems to update found!");
+    }
 
-    // total_diff = 0
-    // for w in work:
-    //     total_diff += w.tdiff
-    // print(f"Found {len(work)} affected workitems, new earn {new_earnings}  total diff {total_diff}")
+    let mut total_diff = 0;
+    for w in &work {
+        total_diff += w.tdiff as u64;
+    }
+    println!("Found {} affected workitems, new earn {}  total diff {}",
+        work.len(), new_earnings, total_diff);
 
-    // remain_earn_msat = new_earnings * 1000
-    // remain_diff = total_diff
+    let mut remain_earn_msat = new_earnings * 1000;
+    let mut remain_diff = total_diff;
 
-    // total_accounted = 0
-    // for w in work:
-    //     diff1 = w.tdiff
-    //     earn1_msat = round(1.0 / float(remain_diff) * float(remain_earn_msat) * float(diff1))
-    //     # print(f"earn1 {earn1}")
-    //     w.committed += earn1_msat
-    //     total_accounted += earn1_msat
-    //     if w.commit_blocks < BLOCKS_WINDOW:
-    //         w.commit_blocks += 1
-    //         if w.commit_blocks == 1:
-    //             w.commit_first_time = block_time
-    //         if w.commit_blocks == BLOCKS_WINDOW:
-    //             w.estimate = 0
-    //     w.commit_next_time = block_time
-    //     remain_earn_msat -= earn1_msat
-    //     remain_diff -= diff1
-    //     affected_user_ids[w.uname_o_id] = 1
+    let mut total_accounted = 0;
+    let mut work_copy = Vec::new();
+    for mut w in work {
+        let diff1 = w.tdiff;
+        let earn1_msat = (1.0 / (remain_diff as f64) * (remain_earn_msat as f64) * (diff1 as f64)).round() as u64;
+        // println!("earn1 {earn1}");
+        w.committed += earn1_msat;
+        total_accounted += earn1_msat;
+        if w.commit_blocks < BLOCKS_WINDOW {
+            w.commit_blocks += 1;
+            if w.commit_blocks == 1 {
+                w.commit_first_time = block_time;
+            }
+            if w.commit_blocks == BLOCKS_WINDOW {
+                w.estimate = 0;
+            }
+        }
+        w.commit_next_time = block_time;
+        let w_uname_o_id = w.uname_o_id;
+        work_copy.push(w);
+        remain_earn_msat -= earn1_msat;
+        remain_diff -= diff1 as u64;
+        affected_user_ids.insert(w_uname_o_id);
+    }
 
-    // # Update in DB
-    // cursor = conn.cursor()
-    // for w in work:
-    //     db.work_update_nocommit(cursor, w)
+    // Update in DB
+    let conntx = conn.transaction()?;
+    for w in &work_copy {
+        db::work_update_nocommit(&conntx, w)?;
+    }
 
-    // # All have been updated
-    // last_block_procd = block_time
-    // db.set_status_last_block_procd(cursor, last_block_procd)
-    // # self.last_block_time = block_time
+    // All have been updated
+    status.last_block_procd = block_time;
+    let _ = db::set_status_last_block_procd(&conntx, status.last_block_procd)?;
+    //self.last_block_time = block_time
 
-    // db.block_update_diff_no_commit(cursor, block_time, total_diff)
-    // cursor.close()
+    let _ = db::block_update_diff_no_commit(&conntx, block_time, total_diff)?;
 
-    // conn.commit()
+    let _ = conntx.commit()?;
 
-    // get_status_status(conn)
+    let _ = get_status_status(conn, status)?;
 
-    // return [total_accounted, total_diff]
-    Err("TODO".into())
+    Ok((total_accounted, total_diff))
 }
 
 // Account for a new block.
 // Find all applicable work items, and update them
 // Return total (new) committed earning accounted
-fn process_new_block(conn: &Connection, nb: &Block, status: &Status, affected_user_ids: &mut HashSet<u32>) -> Result<u64, Box<dyn Error>> {
+fn process_new_block(conn: &mut Connection, nb: &Block, status: &mut Status, affected_user_ids: &mut HashSet<u32>) -> Result<u64, Box<dyn Error>> {
     if nb.earned_sats == 0 {
         println!("ERROR: Block has 0 earning!");
         return Ok(0);
@@ -280,7 +286,7 @@ fn process_new_block(conn: &Connection, nb: &Block, status: &Status, affected_us
 // Return:
 // - the number of blocks processed
 // - total (new) committed earning accounted
-fn process_new_blocks(conn: &Connection, status: &mut Status, affected_user_ids: &mut HashSet<u32>) -> Result<(u32, u64), Box<dyn Error>> {
+fn process_new_blocks(conn: &mut Connection, status: &mut Status, affected_user_ids: &mut HashSet<u32>) -> Result<(u32, u64), Box<dyn Error>> {
     let _ = get_status_status(conn, status)?;
     let new_blocks = db::block_get_new_blocks(conn, status.last_block_procd)?;
     if new_blocks.len() == 0 {
@@ -426,7 +432,7 @@ fn get_avg_block_earn(conn: &Connection) -> Result<f64, Box<dyn Error>> {
 }
 
 fn iteration(conn: &mut Connection, conn_workstat_ro: &Connection, conn_oceanmgr_ro: &Connection, status: &mut Status)  -> Result<(), Box<dyn Error>> {
-    get_status_status(conn, status)?;
+    let _ = get_status_status(conn, status)?;
     print_status(&status);
 
     let mut affected_user_ids = HashSet::<u32>::new();

@@ -1,10 +1,10 @@
 use crate::common::get_db_update_versions_from_args;
 use crate::dto_pc::{Block, Work};
 
-use rusqlite::{Connection, Row, Transaction};
+use rusqlite::{Connection, Params, Row, Transaction};
 use std::error::Error;
 
-// static BLOCKS_WINDOW: u8 = 8;
+static BLOCKS_WINDOW: u8 = 8;
 pub static LATEST_DB_VERSION: u8 = 3;
 
 // Upgrade from an older version, versions taken from args
@@ -248,33 +248,31 @@ pub fn set_status_last_block_retrvd(conntx: &Transaction, newval: u32) -> Result
     Ok(())
 }
 
-/*
-# Doesn't commit
-def set_status_last_block_procd(cursor: sqlite3.Cursor, newval: int):
-    cursor.execute("""
-        UPDATE STATUS
-        SET LastBlockProcd = ?
-    """, (newval,))
+// Doesn't commit
+pub fn set_status_last_block_procd(conntx: &Transaction, newval: u32) -> Result<(), Box<dyn Error>> {
+    let _ = conntx.execute(
+        "UPDATE STATUS SET LastBlockProcd = ?1",
+        (newval,))?;
+    Ok(())
+}
 
+// Doesn't commit
+pub fn set_status_last_payment_procd(conntx: &Transaction, newval: u32) -> Result<(), Box<dyn Error>> {
+    let _ = conntx.execute(
+        "UPDATE STATUS SET LastPaymentProcd = ?1",
+        (newval,))?;
+    Ok(())
+}
 
-# Doesn't commit
-def set_status_last_payment_procd(cursor: sqlite3.Cursor, newval: int):
-    cursor.execute("""
-        UPDATE STATUS
-        SET LastPaymentProcd = ?
-    """, (newval,))
-
-
-# Get Id of a username string, return Id, or -1 if not found
-def userlookup_get_id(cursor: sqlite3.Connection, username_string: str) -> int:
-    cursor.execute("SELECT Id FROM USERLOOKUP WHERE String = ?", (username_string,))
-    rows = cursor.fetchall()
-    if len(rows) >= 1:
-        if len(rows[0]) >= 1:
-            # Found in DB
-            return rows[0][0]
-    return -1
-*/
+// Get Id of a username string, return Id, or None if not found
+pub fn userlookup_get_id(conn: &Connection, username_string: &str) -> Result<Option<u32>, Box<dyn Error>> {
+    let mut stmt = conn.prepare("SELECT Id FROM USERLOOKUP WHERE String = ?1")?;
+    if let Ok(id) = stmt.query_one((username_string,), |row| row.get::<_, u32>(0)) {
+        // found in DB
+        return Ok(Some(id))
+    }
+    return Ok(None)
+}
 
 // Get Id or insert username string, return Id
 // Note: it does'n commit
@@ -300,16 +298,13 @@ fn userlookup_get_or_insert_id_nocommit(conn: &Transaction, username_string: &st
     Err(format!("ERROR Could not insert original user {username_string} {typ}").into())
 }
 
-/*
-def userlookup_get_string(cursor: sqlite3.Cursor, id: int) -> str:
-    cursor.execute("SELECT String FROM USERLOOKUP WHERE Id = ?", (id,))
-    rows = cursor.fetchall()
-    s = "?"
-    if len(rows) >= 1:
-        if len(rows[0]) >= 1:
-            s = rows[0][0]
-    return s
-*/
+pub fn userlookup_get_string(conn: &Connection, id: u32) -> Result<String, Box<dyn Error>> {
+    let mut stmt = conn.prepare("SELECT String FROM USERLOOKUP WHERE Id = ?1")?;
+    if let Ok(string) = stmt.query_one((id,), |row| row.get::<_, String>(0)) {
+        return Ok(string);
+    }
+    return Ok("?".to_string())
+}
 
 // Note: It doesn't commit
 pub fn insert_work_struct_nocommit(conn: &Transaction, mut w: Work) -> Result<usize, Box<dyn Error>> {
@@ -358,24 +353,21 @@ pub fn insert_work_struct_nocommit(conn: &Transaction, mut w: Work) -> Result<us
     Ok(cnt)
 }
 
-/*
-# May throw if cannot connect
-def insert_work_struct(conn: sqlite3.Connection, w: Work):
-    insert_work_struct_nocommit(conn, w)
-    conn.commit()
+pub fn insert_work_struct(conn: &mut Connection, w: Work) -> Result<usize, Box<dyn Error>> {
+    let conntx = conn.transaction()?;
+    let res = insert_work_struct_nocommit(&conntx, w)?;
+    let _ = conntx.commit()?;
+    Ok(res)
+}
 
 
-def get_work_count(cursor: sqlite3.Cursor) -> int:
-    cursor.execute("SELECT COUNT(*) FROM WORK")
-    rows = cursor.fetchall()
-    cnt = 0
-    if len(rows) >= 1:
-        if len(rows[0]) >= 1:
-            if rows[0][0] != None:
-                cnt = rows[0][0]
-    # print(cnt)
-    return cnt
-*/
+pub fn get_work_count(conn: &Connection) -> Result<u32, Box<dyn Error>> {
+    let mut stmt = conn.prepare("SELECT COUNT(*) FROM WORK")?;
+    if let Ok(count) = stmt.query_one((), |row| row.get::<_, u32>(0)) {
+        return Ok(count)
+    }
+    Ok(0)
+}
 
 pub fn work_get_total_committed(conn: &Connection) -> Result<u64, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT SUM(Committed) FROM WORK")?;
@@ -418,59 +410,76 @@ def work_get_user_total_estimated(cursor: sqlite3.Cursor, user_o_id: int) -> int
                 sum = rows[0][0]
     # print(sum)
     return sum
+*/
 
+pub fn work_update_nocommit(conntx: &Transaction, w: &Work) -> Result<(), Box<dyn Error>> {
+    let _ = conntx.execute(
+        "UPDATE WORK \
+            SET \
+                Committed = ?1, \
+                CommitBlocks = ?2, \
+                CommitFirstTime = ?3, \
+                CommitNextTime = ?4, \
+                Estimate = ?5 \
+            WHERE Id = ?6",
+        (w.committed, w.commit_blocks, w.commit_first_time, w.commit_next_time, w.estimate, w.db_id)
+    )?;
+    Ok(())
+}
 
-def work_update_nocommit(cursor: sqlite3.Cursor, w: Work):
-    cursor.execute("""
-        UPDATE WORK
-        SET 
-            Committed = ?,
-            CommitBlocks = ?,
-            CommitFirstTime = ?,
-            CommitNextTime = ?,
-            Estimate = ?
-        WHERE Id = ?
-    """, (w.committed, w.commit_blocks, w.commit_first_time, w.commit_next_time, w.estimate, w.db_id))
-    cursor.fetchall()
+// Private
+fn _work_query_custom<P>(conn: &Connection, condition_string: &str, params: P) -> Result<Vec<Work>, Box<dyn Error>> where P: Params {
+    let query_str = "SELECT \
+        Id, UNameO, UNameOWrkr, UNameU, UNameUWrkr, \
+        TDiff, TimeAdd, \
+        Payed, PayedTime, PayedRef, \
+        Committed, CommitBlocks, CommitFirstTime, CommitNextTime, Estimate \
+        FROM WORK ".to_string() + condition_string;
+    let mut stmt = conn.prepare(&query_str)?;
+    let work = stmt.query_map(params, |row| {
+        Ok(Work::new(
+                row.get::<_, u32>(0)?,
+                "?".to_string(),
+                "?".to_string(),
+                "?".to_string(),
+                "?".to_string(),
+                row.get::<_, u32>(1)?,
+                row.get::<_, u32>(2)?,
+                row.get::<_, u32>(3)?,
+                row.get::<_, u32>(4)?,
+                row.get::<_, u32>(5)?,
+                row.get::<_, f64>(6)?,
+                row.get::<_, u64>(7)?,
+                row.get::<_, u32>(8)?,
+                row.get::<_, String>(9)?,
+                row.get::<_, u64>(10)?,
+                row.get::<_, u16>(11)?,
+                row.get::<_, u32>(12)?,
+                row.get::<_, u32>(13)?,
+                row.get::<_, u64>(14)?,
+            )
+        )
+    })?
+        .filter(|res| res.is_ok())
+        .map(|res| res.unwrap())
+        .collect::<Vec<Work>>();
+    // println!("work len {}", work.len());
+    Ok(work)
+}
 
+// Return work items that are to be affected by a new block earning
+// Note: usernames are not filled (to save on joins)
+pub fn work_get_affected_by_new_block(conn: &Connection, block_time: u32) -> Result<Vec<Work>, Box<dyn Error>> {
+    _work_query_custom(conn,
+        "WHERE \
+            CommitBlocks < ?1 AND \
+            TimeAdd <= ?2 AND \
+            CommitNextTime < ?3 \
+            ORDER BY Id ASC",
+        (BLOCKS_WINDOW, block_time, block_time))
+}
 
-# Private
-def work_query_custom(cursor: sqlite3.Cursor, condition_string: str, arguments) -> list[Work]:
-    cursor.execute("""
-        SELECT
-            Id, UNameO, UNameOWrkr, UNameU, UNameUWrkr,
-            TDiff, TimeAdd,
-            Payed, PayedTime, PayedRef,
-            Committed, CommitBlocks, CommitFirstTime, CommitNextTime, Estimate
-        FROM WORK
-        """ + condition_string,
-        arguments)
-    res = []
-    rows = cursor.fetchall()
-    for r in rows:
-        if len(r) >= 15:
-            res.append(Work(
-                r[0],
-                "?", "?", "?", "?",
-                r[1], r[2], r[3], r[4],
-                r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14]
-            ))
-    # print(len(res))
-    return res
-
-
-# Return work items that are to be affected by a new block earning
-# Note: usernames are not filled (to save on joins)
-def work_get_affected_by_new_block(cursor: sqlite3.Cursor, block_time: int) -> list[Work]:
-    return work_query_custom(cursor, """
-        WHERE
-            CommitBlocks < ? AND
-            TimeAdd <= ? AND
-            CommitNextTime < ?
-        ORDER BY Id ASC
-    """, (BLOCKS_WINDOW, block_time, block_time,))
-
-
+/*
 # Return all work items. Can be slow!
 def work_get_all(cursor: sqlite3.Cursor, start_time: int) -> list[Work]:
     return work_query_custom(cursor, """
@@ -699,31 +708,25 @@ pub fn block_get_last_avg_n(conn: &Connection, last_block_count: u32) -> Result<
     // First find the N most recent blocks
     // Clamp to 3 -- 100
     let count = std::cmp::max(std::cmp::min(last_block_count, 100), 3);
-    // let mut stmt QQQQ = cursor.execute(f"SELECT Time FROM PC_BLOCK ORDER BY Time DESC LIMIT {count}")
-    // rows = cursor.fetchall()
-    // if len(rows) == 0:
-    //     return [0, 0]
-    // lastrow = rows[len(rows) - 1]
-    // if len(lastrow) == 0:
-    //     return [0, 0]
-    // last_block_time = lastrow[0]
+    let mut stmt = conn.prepare("SELECT Time FROM PC_BLOCK ORDER BY Time DESC LIMIT ?1")?;
+    let times = stmt.query_map((count,), |row| row.get::<_, u32>(0))?
+        .filter(|res| res.is_ok())
+        .map(|res| res.unwrap())
+        .collect::<Vec<u32>>();
+    if times.len() == 0 {
+        return Ok((0, 0))
+    }
+    let last_block_time = times[times.len() - 1];
 
-    // cursor.execute("""
-    //     SELECT SUM(Earning), SUM(AccTotalDiff)
-    //     FROM PC_BLOCK
-    //     WHERE Time >= ?
-    // """, (last_block_time,))
-    // rows = cursor.fetchall()
-    // sum_e = 0
-    // sum_d = 0
-    // if len(rows) >= 1:
-    //     row = rows[0]
-    //     if len(row) >= 1:
-    //         sum_e = row[0]
-    //     if len(row) >= 2:
-    //         sum_d = row[1]
-    // return [sum_e, sum_d]
-    Err("TODO".into())
+    let mut stmt2 = conn.prepare(
+        "SELECT SUM(Earning), SUM(AccTotalDiff) \
+            FROM PC_BLOCK \
+            WHERE Time >= ?1")?;
+    let (sum_earn, sum_diff) = stmt2.query_one((last_block_time,), |row| Ok((
+        row.get::<_, u64>(0)?,
+        row.get::<_, u64>(0)?,
+    )))?;
+    Ok((sum_earn, sum_diff))
 }
 
 /*
