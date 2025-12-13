@@ -125,7 +125,7 @@ impl ToString for Block {
 // A snapshot a miner at a given time.
 // Miner is the base miner username (without worker name)
 // Amounts in Msat
-struct MinerSnapshot {
+pub struct MinerSnapshot {
     pub user_id: u32,
     pub user_s: String,
     pub time: u32,
@@ -155,7 +155,7 @@ impl MinerSnapshot {
     }
 }
 
-struct PayRequest {
+pub struct PayRequest {
     pub id: i32,
     pub miner_id: u32,
     pub req_amnt: u64,
@@ -177,11 +177,11 @@ impl PayRequest {
     }
 }
 
-struct Payment {
+pub struct Payment {
     pub id: i32,
     pub req_id: i32,
     pub create_time: u32,
-    pub status: String,
+    pub status: u8,
     pub status_time: u32,
     pub error_code: u8,
     pub error_str: String,
@@ -196,7 +196,7 @@ struct Payment {
 }
 
 impl Payment {
-    pub fn new(id: i32, req_id: i32, create_time: u32, status: String, status_time: u32, error_code: u8, error_str: String, retry_cnt: u8, fail_time: u32, secon_id: String, terti_id: String, paid_amnt: u64, paid_fee: u32, pay_time: u32, pay_ref: String) -> Self {
+    pub fn new(id: i32, req_id: i32, create_time: u32, status: u8, status_time: u32, error_code: u8, error_str: String, retry_cnt: u8, fail_time: u32, secon_id: String, terti_id: String, paid_amnt: u64, paid_fee: u32, pay_time: u32, pay_ref: String) -> Self {
         Self {
             id,
             req_id,

@@ -25,8 +25,8 @@ pub fn get_new_blocks(conn: &Connection, old_time: u32) -> Result<Vec<BlockEarni
 
     let mut stmt = conn.prepare(query_str)?;
     let vector = stmt.query_map((old_time,), |row| blockearning_from_row(row))?
-        .filter(|ber| ber.is_ok())
-        .map(|ber| ber.unwrap())
+        .filter(|res| res.is_ok())
+        .map(|res| res.unwrap())
         .collect::<Vec<BlockEarning>>();
     Ok(vector)
 }

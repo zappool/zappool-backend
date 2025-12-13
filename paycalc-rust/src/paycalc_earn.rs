@@ -1,7 +1,7 @@
 use crate::db_oc;
 use crate::db_pc as db;
 use crate::db_ws::get_work_after_id;
-use crate::dto_pc::{Block, Work};
+use crate::dto_pc::{Block, MinerSnapshot, Work};
 
 use rusqlite::Connection;
 
@@ -305,34 +305,30 @@ fn process_new_blocks(conn: &mut Connection, status: &mut Status, affected_user_
     Ok((new_blocks.len() as u32, total_accounted))
 }
 
-/*
-# Return if new payments found
-def retrieve_new_payments(conn: sqlite3.Connection, affected_user_ids: map) -> int:
-    global last_payment_procd
-    global birth_time
-    # cursor = conn.cursor()
-    cutoff_time = max(last_payment_procd, birth_time)
-    new_payments = db.payment_get_all_after_time(conn, cutoff_time)
-    # cursor.close()
-    # print(f"new_payments {len(new_payments)}  {new_payments}")
+// Return if new payments found
+fn retrieve_new_payments(conn: &mut Connection, status: &mut Status, affected_user_ids: &mut HashSet<u32>) -> Result<u32, Box<dyn Error>> {
+    let cutoff_time = std::cmp::max(status.last_payment_procd, status.birth_time as i32) as u32;
+    let new_payments = db::payment_get_all_after_time(conn, cutoff_time)?;
+    //print(f"new_payments {len(new_payments)}  {new_payments}")
 
-    if len(new_payments) < 1:
-        return 0
+    if new_payments.is_empty() {
+        return Ok(0);
+    }
 
-    for [_paym, pr] in new_payments:
-        affected_user_ids[pr.miner_id] = 1
+    for (_paym, pr) in &new_payments {
+        affected_user_ids.insert(pr.miner_id);
+    }
 
-    last_time = new_payments[len(new_payments) - 1][0].status_time
-    # print(f"Updating last_payment_procd from {last_payment_procd} to {last_time}")
-    last_payment_procd = last_time
-    cursor = conn.cursor()
-    db.set_status_last_payment_procd(cursor, last_payment_procd)
-    conn.commit()
-    cursor.close()
-    get_status_status(conn)
-    print(f"New last_payment_procd: {last_payment_procd}")
-    return len(new_payments)
-*/
+    let last_time = new_payments[new_payments.len() - 1].0.status_time;
+    //print(f"Updating last_payment_procd from {last_payment_procd} to {last_time}")
+    status.last_payment_procd = last_time as i32;
+    let conntx = conn.transaction()?;
+    let _ = db::set_status_last_payment_procd(&conntx, status.last_payment_procd as u32)?;
+    let _ = conntx.commit()?;
+    let _ = get_status_status(conn, status)?;
+    println!("New last_payment_procd: {}", status.last_payment_procd);
+    Ok(new_payments.len() as u32)
+}
 
 // Update estimate for given workitems, if not fully committed
 // Return the changed workitems
@@ -361,29 +357,29 @@ fn update_given_work_estimates(work: &Vec<Work>, avg_earn_per_diff_sat: f64) -> 
     Ok(updated_work)
 }
 
+// Update estimate for workitems not fully accounted
+// Return number of workitems considered (updated or unchanged)
+fn update_work_estimates(conn: &mut Connection, birth_time: u32, avg_earn_per_diff_sat: f64, affected_user_ids: &mut HashSet<u32>) -> Result<u32, Box<dyn Error>> {
+    let work = db::work_get_for_estimate_update(conn, birth_time)?;
+    //println!("{len(work)} workitems found for estimation");
+    if work.is_empty() {
+        return Ok(0);
+    }
+    let updated_work = update_given_work_estimates(&work, avg_earn_per_diff_sat)?;
+    if !updated_work.is_empty() {
+        // Save them
+        let mut conntx = conn.transaction()?;
+        for w in &updated_work {
+            let _ = db::work_update_nocommit(&mut conntx, w)?;
+            affected_user_ids.insert(w.uname_o_id);
+        }
+        let _ = conntx.commit()?;
+    }
+    println!("Updated estimates: {}/{} workitem estimates updated", updated_work.len(), work.len());
+    Ok(work.len() as u32)
+}
+
 /*
-# Update estimate for workitems not fully accounted
-# Return number of workitems considered (updated or unchanged)
-def update_work_estimates(conn: sqlite3.Connection, birth_time: int, avg_earn_per_diff_sat: float, affected_user_ids: map) -> int:
-    cursor = conn.cursor()
-    work = db.work_get_for_estimate_update(cursor, birth_time)
-    # print(f"{len(work)} workitems found for estimation")
-    cursor.close()
-    if len(work) == 0:
-        return 0
-    updated_work = update_given_work_estimates(work, avg_earn_per_diff_sat)
-    if len(updated_work) > 0:
-        # Save them
-        cursor = conn.cursor()
-        for w in updated_work:
-            db.work_update_nocommit(cursor, w)
-            affected_user_ids[w.uname_o_id] = 1
-        cursor.close()
-        conn.commit()
-    print(f"Updated estimates: {len(updated_work)}/{len(work)} workitem estimates updated")
-    return len(work)
-
-
 # Update estimate for all workitems
 # Return number of workitems updated
 def update_all_work_estimates_nocommit(conn: sqlite3.Connection, birth_time: int, avg_earn_per_diff_sat: float) -> int:
@@ -400,25 +396,27 @@ def update_all_work_estimates_nocommit(conn: sqlite3.Connection, birth_time: int
     cursor.close()
     print(f"Updated estimates: {len(updated_work)}/{len(work)} workitem estimates updated")
     return len(updated_work)
-
-
-def create_new_miner_record_if_needed(cursor: sqlite3.Cursor, id: int):
-    if db.miner_ss_exists(cursor, id):
-        return
-    now_utc = round(datetime.now(UTC).timestamp())
-    user_s = db.userlookup_get_string(cursor, id)
-    miner_ss = MinerSnapshot(id, user_s, now_utc, 0, 0, 0, 0, 0, -1)
-    db.miner_ss_insert_nocommit(cursor, miner_ss)
-
-
-def create_new_miner_records_if_needed(conn: sqlite3.Connection, affected_user_ids: map):
-    cursor = conn.cursor()
-    for id in affected_user_ids:
-        create_new_miner_record_if_needed(cursor, id)
-    conn.commit()
-    cursor.close()
 */
 
+fn create_new_miner_record_if_needed(conn: &Connection, id: u32) -> Result<(), Box<dyn Error>> {
+    if db::miner_ss_exists(conn, id)? {
+        return Ok(());
+    }
+    let now_utc = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as u32;
+    let user_s = db::userlookup_get_string(conn, id)?;
+    let miner_ss = MinerSnapshot::new(id, user_s, now_utc, 0, 0, 0, 0, 0, -1);
+    let _ = db::miner_ss_insert_nocommit(conn, &miner_ss)?;
+    Ok(())
+}
+
+fn create_new_miner_records_if_needed(conn: &mut Connection, affected_user_ids: &HashSet<u32>) -> Result<(), Box<dyn Error>> {
+    let conntx = conn.transaction()?;
+    for id in affected_user_ids {
+        let _ = create_new_miner_record_if_needed(&conntx, *id)?;
+    }
+    let _ = conntx.commit()?;
+    Ok(())
+}
 
 fn get_avg_block_earn(conn: &Connection) -> Result<f64, Box<dyn Error>> {
     let (sum_earn, sum_diff) = db::block_get_last_avg_n(conn, BLOCK_AVERAGE_EARNING_COUNT)?;
@@ -441,33 +439,34 @@ fn iteration(conn: &mut Connection, conn_workstat_ro: &Connection, conn_oceanmgr
     let cnt_bl1 = count_new_blocks(conn_oceanmgr_ro, status)?;
     // println!("New block count: {cnt_bl1}");
 
-    // TODO TODO
-    let cnt_new_payment = 0;
-    // cnt_new_payment = retrieve_new_payments(conn, affected_user_ids)
-    // TODO TODO
+    let cnt_new_payment = retrieve_new_payments(conn, status, &mut affected_user_ids)?;
 
     if cnt_wi == 0 && cnt_bl1 == 0 && cnt_new_payment == 0 {
         // println("No new data found");
         return Ok(());
     }
 
-    let cnt_bl2 = 0;
-    let new_blocks_accntd = 0;
+    let mut cnt_bl2 = 0;
+    let mut new_blocks_accntd = 0;
+    let mut tot_blocks_earned: u64 = 0;
+    let mut tot_work_comm_pre: u64 = 0;
+    let mut tot_work_comm_post: u64 = 0;
+    let mut tot_work_estim_pre: u64 = 0;
     if cnt_wi > 0 || cnt_bl1 > 0 {
-        let cnt_bl1 = retrieve_new_blocks(conn, conn_oceanmgr_ro, status)?;
+        let _cnt_bl1 = retrieve_new_blocks(conn, conn_oceanmgr_ro, status)?;
         print_status(&status);
 
-        let tot_blocks_earned = db::block_get_total_earned(conn)?;
-        let tot_work_comm_pre = db::work_get_total_committed(conn)?;
+        tot_blocks_earned = db::block_get_total_earned(conn)?;
+        tot_work_comm_pre = db::work_get_total_committed(conn)?;
 
-        let (cnt_bl2, new_blocks_accntd) = process_new_blocks(conn, status, &mut affected_user_ids)?;
+        (cnt_bl2, new_blocks_accntd) = process_new_blocks(conn, status, &mut affected_user_ids)?;
         print_status(&status);
 
         // Blocks processed (zero or more)
-        let tot_work_comm_post = db::work_get_total_committed(conn)?;
-        let tot_work_estim_pre = db::work_get_total_estimated(conn)?;
+        tot_work_comm_post = db::work_get_total_committed(conn)?;
+        tot_work_estim_pre = db::work_get_total_estimated(conn)?;
 
-        // TODO fix
+        // Check for consistency
         let expected_new_comm_msat = tot_blocks_earned * 1000;
         if expected_new_comm_msat != tot_work_comm_post {
             println!("ERROR: Total work committed and blocks committed mismatch {} vs. {} diff {}   {} {} {}",
@@ -482,26 +481,25 @@ fn iteration(conn: &mut Connection, conn_workstat_ro: &Connection, conn_oceanmgr
     // Some info changed, update snapshots
     let avg_earn = get_avg_block_earn(conn)?;
 
-    // TODO TODO
-    // let cnt_considered = update_work_estimates(conn, birth_time, avg_earn, affected_user_ids)?;
+    let cnt_considered = update_work_estimates(conn, status.birth_time, avg_earn, &mut affected_user_ids)?;
 
-    // cursor = conn.cursor()
-    // tot_work_estim_post = db.work_get_total_estimated(cursor)
-    // cursor.close()
+    let tot_work_estim_post = db::work_get_total_estimated(conn)?;
 
-    // create_new_miner_records_if_needed(conn, affected_user_ids)
+    let _ = create_new_miner_records_if_needed(conn, &mut affected_user_ids)?;
 
-    // if cnt_bl2 > 0:
-    //     print(f"iteration: processed {cnt_bl2} block(s) with {new_blocks_accntd} msat, {last_block_procd}  {tot_blocks_earned}  comm {tot_work_comm_pre} -> {tot_work_comm_post} ({tot_work_comm_post - tot_work_comm_pre})  estim {tot_work_estim_pre} -> {tot_work_estim_post} ({tot_work_estim_post - tot_work_estim_pre})")
+    if cnt_bl2 > 0 {
+        println!("iteration: processed {} block(s) with {} msat, {}  {}  comm {} -> {} ({})  estim {} -> {} ({})",
+            cnt_bl2, new_blocks_accntd, status.last_block_procd, tot_blocks_earned, tot_work_comm_pre, tot_work_comm_post, tot_work_comm_post - tot_work_comm_pre, tot_work_estim_pre, tot_work_estim_post, tot_work_estim_post - tot_work_estim_pre);
+    }
 
-    // print(f"  new payments: {cnt_new_payment} ({last_payment_procd})")
-    // print(f"  users affected: {len(affected_user_ids)}  workitems considered: {cnt_considered}")
+    println!("  new payments: {} ({})", cnt_new_payment, status.last_payment_procd);
+    println!("  users affected: {}  workitems considered: {}", affected_user_ids.len(), cnt_considered);
 
-    // # if len(affected_user_ids.keys()) >= 1:
-    // #     id = list(affected_user_ids.keys())[0]
-    // #     cursor = conn.cursor()
-    // #     print(f"    miner user id {id} {db.userlookup_get_string(cursor, id)} {db.work_get_user_total_committed(cursor, id)} {db.work_get_user_total_estimated(cursor, id)}")
-    // #     cursor.close()
+    // if len(affected_user_ids.keys()) >= 1:
+    //     id = list(affected_user_ids.keys())[0]
+    //     cursor = conn.cursor()
+    //     print(f"    miner user id {id} {db.userlookup_get_string(cursor, id)} {db.work_get_user_total_committed(cursor, id)} {db.work_get_user_total_estimated(cursor, id)}")
+    //     cursor.close()
 
     Ok(())
 }

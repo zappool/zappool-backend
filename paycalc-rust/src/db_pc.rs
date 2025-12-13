@@ -1,5 +1,5 @@
 use crate::common::get_db_update_versions_from_args;
-use crate::dto_pc::{Block, Work};
+use crate::dto_pc::{Block, MinerSnapshot, PayRequest, Payment, Work};
 
 use rusqlite::{Connection, Params, Row, Transaction};
 use std::error::Error;
@@ -479,24 +479,22 @@ pub fn work_get_affected_by_new_block(conn: &Connection, block_time: u32) -> Res
         (BLOCKS_WINDOW, block_time, block_time))
 }
 
+// Return all work items. Can be slow!
+pub fn work_get_all(conn: &Connection, start_time: u32) -> Result<Vec<Work>, Box<dyn Error>> {
+    _work_query_custom(conn, "WHERE TimeAdd >= ?1", (start_time,))
+}
+
+// Get work records whose estimate can be updated,
+// that is, they are not completely accounted for yet
+pub fn work_get_for_estimate_update(conn: &Connection, birth_time: u32) -> Result<Vec<Work>, Box<dyn Error>> {
+    _work_query_custom(conn,
+        "WHERE
+            CommitBlocks < ?1 AND
+            TimeAdd > ?2",
+        (BLOCKS_WINDOW, birth_time,))
+}
+
 /*
-# Return all work items. Can be slow!
-def work_get_all(cursor: sqlite3.Cursor, start_time: int) -> list[Work]:
-    return work_query_custom(cursor, """
-        WHERE TimeAdd >= ?
-    """, (start_time,))
-
-
-# Get work records whose estimate can be updated,
-# that is, they are not completely accounted for yet
-def work_get_for_estimate_update(cursor: sqlite3.Cursor, birth_time: int) -> list[Work]:
-    return work_query_custom(cursor, """
-        WHERE
-            CommitBlocks < ? AND
-            TimeAdd > ?
-    """, (BLOCKS_WINDOW, birth_time,))
-
-
 def work_get_recent(cursor: sqlite3.Cursor) -> Work:
     list = work_query_custom(cursor, """
         ORDER BY TimeAdd DESC
@@ -729,45 +727,42 @@ pub fn block_get_last_avg_n(conn: &Connection, last_block_count: u32) -> Result<
     Ok((sum_earn, sum_diff))
 }
 
+pub fn miner_ss_exists(conn: &Connection, id: u32) -> Result<bool, Box<dyn Error>> {
+    let mut stmt = conn.prepare("SELECT UserId FROM MINER_SS WHERE UserId = ?1")?;
+    let mut rows = stmt.query((id,))?;
+    let exists = rows.next()?.is_some();
+    Ok(exists)
+}
+
+pub fn miner_ss_insert_nocommit(conn: &Connection, ss: &MinerSnapshot) -> Result<(), Box<dyn Error>> {
+    // History: simply insert
+    let _ = conn.execute(
+        "INSERT INTO MINER_SS_HIST \
+        (UserId, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId) \
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        (ss.user_id, ss.time, ss.tot_commit, ss.tot_estimate, ss.tot_paid, ss.unpaid, ss.unpaid_cons, ss.payreq_id,))?;
+
+    // Update-or-add.
+    let _ = conn.execute(
+        "UPDATE MINER_SS \
+        SET Time = ?1, TotCommit = ?2, TotEstimate = ?3, TotPaid = ?4, Unpaid = ?5, UnpaidCons = ?6, PayReqId = ?7
+        WHERE UserId = ?8",
+        (ss.time, ss.tot_commit, ss.tot_estimate, ss.tot_paid, ss.unpaid, ss.unpaid_cons, ss.payreq_id, ss.user_id,))?;
+
+    let mut stmt = conn.prepare("SELECT UserId FROM MINER_SS WHERE UserId = ?1")?;
+    let mut id = stmt.query((ss.user_id,))?;
+    if id.next()?.is_none() {
+        // Not present
+        let _ = conn.execute(
+            "INSERT INTO MINER_SS \
+            (UserId, UserS, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId) \
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            (ss.user_id, &ss.user_s, ss.time, ss.tot_commit, ss.tot_estimate, ss.tot_paid, ss.unpaid, ss.unpaid_cons, ss.payreq_id))?;
+    }
+    Ok(())
+}
+
 /*
-def miner_ss_exists(cursor: sqlite3.Cursor, id: int) -> bool:
-    cursor.execute("SELECT UserId FROM MINER_SS WHERE UserId = ?", (id,))
-    rows = cursor.fetchall()
-    if len(rows) == 0:
-        return False
-    return True
-
-
-def miner_ss_insert_nocommit(cursor: sqlite3.Cursor, ss: MinerSnapshot):
-    # History: simply insert
-    cursor.execute("""
-        INSERT INTO MINER_SS_HIST
-        (UserId, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (ss.user_id, ss.time, ss.tot_commit, ss.tot_estimate, ss.tot_paid, ss.unpaid, ss.unpaid_cons, ss.payreq_id,))
-
-    # Update-or-add.
-    cursor.execute("""
-        UPDATE MINER_SS
-        SET Time = ?, TotCommit = ?, TotEstimate = ?, TotPaid = ?, Unpaid = ?, UnpaidCons = ?, PayReqId = ?
-        WHERE UserId = ?
-        """,
-        (ss.time, ss.tot_commit, ss.tot_estimate, ss.tot_paid, ss.unpaid, ss.unpaid_cons, ss.payreq_id, ss.user_id,))
-
-    cursor.execute("SELECT UserId FROM MINER_SS WHERE UserId = ?", (ss.user_id,))
-    rows = cursor.fetchall()
-    if len(rows) == 0:
-        # Not present
-        cursor.execute("""
-            INSERT INTO MINER_SS
-            (UserId, UserS, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (ss.user_id, ss.user_s, ss.time, ss.tot_commit, ss.tot_estimate, ss.tot_paid, ss.unpaid, ss.unpaid_cons, ss.payreq_id)
-        )
-
-
 def miner_ss_get_all(conn: sqlite3.Connection) -> list[MinerSnapshot]:
     cursor = conn.cursor()
     cursor.execute("""
@@ -957,32 +952,54 @@ def payment_get_total_paid_to_miner(cursor: sqlite3.Cursor, miner_id: int) -> in
 #         if len(rows[0]) >= 1:
 #             return rows[0][0]
 #     return None
+*/
 
+// Get all payments updated after a certain time
+// Time comparison is strict
+pub fn payment_get_all_after_time(conn: &Connection, time: u32) -> Result<Vec<(Payment, PayRequest)>, Box<dyn Error>> {
+    let mut stmt = conn.prepare(
+        "SELECT \
+            PAYREQ.Id, PAYREQ.MinerId, PAYREQ.ReqAmnt, PAYREQ.PayMethod, PAYREQ.PriId, PAYREQ.ReqTime, \
+            PAYMENT.Id, PAYMENT.ReqId, PAYMENT.CreateTime, PAYMENT.Status, PAYMENT.StatusTime, PAYMENT.ErrorCode, PAYMENT.ErrorStr, PAYMENT.RetryCnt, PAYMENT.FailTime, PAYMENT.SeconId, PAYMENT.TertiId, PAYMENT.PaidAmnt, PAYMENT.PaidFee, PAYMENT.PayTime, PAYMENT.PayRef \
+            FROM PAYMENT \
+            INNER JOIN PAYREQ ON PAYMENT.ReqId = PAYREQ.Id \
+            WHERE PAYMENT.StatusTime > ?1 \
+            ORDER BY PAYMENT.StatusTime ASC")?;
+    let res = stmt.query_map((time,), |row| {
+        let pr = PayRequest::new(
+            row.get::<_, i32>(0)?,
+            row.get::<_, u32>(1)?,
+            row.get::<_, u64>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, String>(4)?,
+            row.get::<_, u32>(5)?,
+        );
+        let paym = Payment::new(
+            row.get::<_, i32>(6)?,
+            row.get::<_, i32>(7)?,
+            row.get::<_, u32>(8)?,
+            row.get::<_, u8>(9)?,
+            row.get::<_, u32>(10)?,
+            row.get::<_, u8>(11)?,
+            row.get::<_, String>(12)?,
+            row.get::<_, u8>(13)?,
+            row.get::<_, u32>(14)?,
+            row.get::<_, String>(15)?,
+            row.get::<_, String>(16)?,
+            row.get::<_, u64>(17)?,
+            row.get::<_, u32>(18)?,
+            row.get::<_, u32>(19)?,
+            row.get::<_, String>(20)?,
+        );
+        Ok((paym, pr))
+    })?
+        .filter(|res| res.is_ok())
+        .map(|res| res.unwrap())
+        .collect::<Vec<(Payment, PayRequest)>>();
+    Ok(res)
+}
 
-# Get all payments updated after a certain time
-# Time comparison is strict
-def payment_get_all_after_time(conn: sqlite3.Connection, time: int) -> list[tuple[Payment, PayRequest]]:
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT
-        PAYREQ.Id, PAYREQ.MinerId, PAYREQ.ReqAmnt, PAYREQ.PayMethod, PAYREQ.PriId, PAYREQ.ReqTime,
-        PAYMENT.Id, PAYMENT.ReqId, PAYMENT.CreateTime, PAYMENT.Status, PAYMENT.StatusTime, PAYMENT.ErrorCode, PAYMENT.ErrorStr, PAYMENT.RetryCnt, PAYMENT.FailTime, PAYMENT.SeconId, PAYMENT.TertiId, PAYMENT.PaidAmnt, PAYMENT.PaidFee, PAYMENT.PayTime, PAYMENT.PayRef
-        FROM PAYMENT
-        INNER JOIN PAYREQ ON PAYMENT.ReqId = PAYREQ.Id
-        WHERE PAYMENT.StatusTime > ?
-        ORDER BY PAYMENT.StatusTime ASC
-    """, (time,))
-    rows = cursor.fetchall()
-    res = []
-    for r in rows:
-        if len(r) >= 21:
-            pr = PayRequest(r[0], r[1], r[2], r[3], r[4], r[5])
-            paym = Payment(r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16], r[17], r[18], r[19], r[20])
-            res.append([paym, pr])
-    cursor.close()
-    return res
-
-
+/*
 # Get all payments updated after a certain time, for a user
 # Time comparison is strict
 def payment_get_all_after_time_user(conn: sqlite3.Connection, time: int, user_id: int) -> list[tuple[Payment, PayRequest]]:
