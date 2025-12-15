@@ -1,4 +1,4 @@
-use paycalc_rust::common::{get_db_file, get_db_update_versions_from_args, print_current_db_version};
+use paycalc_rust::common_db::{get_db_file, get_db_update_versions_from_args, print_current_db_version};
 use paycalc_rust::db_pc::{LATEST_DB_VERSION, db_setup};
 
 use rusqlite::Connection;

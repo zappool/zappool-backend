@@ -36,7 +36,7 @@ pub fn count_new_blocks(conn: &Connection, old_time: u32) -> Result<u32, Box<dyn
         "SELECT COUNT(*) FROM OC_BLOCK_EARN WHERE Time > ?"
     )?;
     let res = stmt.query_one((old_time,), |row| {
-        row.get::<_, u32>(0)
+        Ok(row.get::<_, u32>(0).unwrap_or(0))
     })?;
     Ok(res)
 }

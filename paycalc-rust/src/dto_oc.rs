@@ -1,6 +1,6 @@
 use std::u32;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BlockEarning {
     pub time: u32,
     pub block_hash: String,

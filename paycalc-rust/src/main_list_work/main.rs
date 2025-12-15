@@ -1,4 +1,4 @@
-use paycalc_rust::common::get_db_file;
+use paycalc_rust::common_db::get_db_file;
 use paycalc_rust::db_ws::{get_work_count, get_work_after_id};
 use paycalc_rust::db_pc::get_status;
 

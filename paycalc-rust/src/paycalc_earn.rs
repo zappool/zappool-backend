@@ -14,7 +14,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 const BLOCKS_WINDOW: u16 = 8;
 const BLOCK_AVERAGE_EARNING_COUNT: u32 = 16;
 
-struct Status {
+pub struct Status {
     birth_time: u32,
     last_workitem_retrvd: i32,
     last_workitem_time_retrvd: u32,
@@ -24,7 +24,7 @@ struct Status {
 }
 
 impl Status {
-    fn new(birth_time: u32) -> Self { Self {
+    pub fn new(birth_time: u32) -> Self { Self {
         birth_time,
         last_workitem_retrvd: -1,
         last_workitem_time_retrvd: 0,
@@ -34,10 +34,10 @@ impl Status {
     }}
 }
 
-fn get_status_status(conn: &Connection, status: &mut Status) -> Result<(), Box<dyn Error>> {
+pub fn get_status_status(conn: &Connection, status: &mut Status) -> Result<(), Box<dyn Error>> {
     let (last_workitem_retrvd, last_block_retrvd, last_block_procd, last_payment_procd, last_workitem_time_retrvd) = db::get_status(conn)?;
-    println!("Workitems: last retrieved: {last_workitem_retrvd} / {last_workitem_time_retrvd}");
-    println!("Blocks: last retrieved / processed: {last_block_retrvd} / {last_block_procd}");
+    // println!("Workitems: last retrieved: {last_workitem_retrvd} / {last_workitem_time_retrvd}");
+    // println!("Blocks: last retrieved / processed: {last_block_retrvd} / {last_block_procd}");
     status.last_workitem_retrvd = last_workitem_retrvd;
     status.last_workitem_time_retrvd = last_workitem_time_retrvd;
     status.last_block_retrvd = last_block_retrvd;
@@ -46,13 +46,13 @@ fn get_status_status(conn: &Connection, status: &mut Status) -> Result<(), Box<d
     Ok(())
 }
 
-fn print_status(status: &Status) {
+pub fn print_status(status: &Status) {
     let now_utc = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
     println!("Status: now {} \t last work ID {} / {} \t last block time {} \t last_payment_procd {}",
         now_utc, status.last_workitem_retrvd, status.last_workitem_time_retrvd, status.last_block_retrvd, status.last_payment_procd);
 }
 
-fn print_blocks(conn: &Connection) -> Result<(), Box<dyn Error>> {
+pub fn print_blocks(conn: &Connection) -> Result<(), Box<dyn Error>> {
     let days = 7;
     let now_utc = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as u32;
     let start_time = now_utc - days * 86400;
@@ -72,7 +72,7 @@ fn print_blocks(conn: &Connection) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn print_block_stats(conn: &Connection) -> Result<(), Box<dyn Error>> {
+pub fn print_block_stats(conn: &Connection) -> Result<(), Box<dyn Error>> {
     println!();
     let total_earn = db::block_get_total_earn(conn)
         .unwrap_or(0);
@@ -91,7 +91,7 @@ fn print_block_stats(conn: &Connection) -> Result<(), Box<dyn Error>> {
 /// Get new workitems (from workitem.db)
 /// Writes into paycalc, commits. Also updates last_workitem_retrvd & last_workitem_time_retrvd.
 fn retrieve_new_workitems(conn_workitem_ro: &Connection, conn: &mut Connection, status: &mut Status, affected_user_ids: &mut HashSet<u32>) -> Result<usize, Box<dyn Error>> {
-    println!("Getting new workitems, after ID {} / {}...", status.last_workitem_retrvd, status.last_workitem_time_retrvd);
+    // println!("Getting new workitems, after ID {} / {}...", status.last_workitem_retrvd, status.last_workitem_time_retrvd);
     let start_time = std::cmp::max(status.birth_time, status.last_workitem_time_retrvd);
 
     let newworkitems = get_work_after_id(conn_workitem_ro, status.last_workitem_retrvd, start_time, 0)?;
@@ -128,9 +128,8 @@ fn retrieve_new_workitems(conn_workitem_ro: &Connection, conn: &mut Connection, 
             wi.uname_o, wi.uname_o_wrkr, wi.uname_u, wi.uname_u_wrkr,
             0, 0, 0, 0,
             wi.tdiff, wi.time_add, 0, 0, "".to_string(), 0, 0, 0, 0, 0);
-        let wi_uname_o_id = wi_pc.uname_o_id;
-        db::insert_work_struct_nocommit(&conntx, wi_pc)?;
-        let _ = affected_user_ids.insert(wi_uname_o_id);
+        let (wi2, _cnt) = db::insert_work_struct_nocommit(&conntx, wi_pc)?;
+        let _ = affected_user_ids.insert(wi2.uname_o_id);
     }
 
     status.last_workitem_retrvd = new_last as i32;
@@ -217,8 +216,9 @@ fn account_for_new_block(conn: &mut Connection, block_time: u32, new_earnings: u
     let mut work_copy = Vec::new();
     for mut w in work {
         let diff1 = w.tdiff;
+        //println!(f"{}", (1.0 / (remain_diff as f64) * (remain_earn_msat as f64) * (diff1 as f64)));
         let earn1_msat = (1.0 / (remain_diff as f64) * (remain_earn_msat as f64) * (diff1 as f64)).round() as u64;
-        // println!("earn1 {earn1}");
+        //println!(f"earn1_msat {earn1_msat}");
         w.committed += earn1_msat;
         total_accounted += earn1_msat;
         if w.commit_blocks < BLOCKS_WINDOW {
@@ -315,11 +315,11 @@ fn retrieve_new_payments(conn: &mut Connection, status: &mut Status, affected_us
         return Ok(0);
     }
 
-    for (_paym, pr) in &new_payments {
+    for (pr, _paym) in &new_payments {
         affected_user_ids.insert(pr.miner_id);
     }
 
-    let last_time = new_payments[new_payments.len() - 1].0.status_time;
+    let last_time = new_payments[new_payments.len() - 1].1.status_time;
     //print(f"Updating last_payment_procd from {last_payment_procd} to {last_time}")
     status.last_payment_procd = last_time as i32;
     let conntx = conn.transaction()?;
@@ -361,7 +361,7 @@ fn update_given_work_estimates(work: &Vec<Work>, avg_earn_per_diff_sat: f64) -> 
 // Return number of workitems considered (updated or unchanged)
 fn update_work_estimates(conn: &mut Connection, birth_time: u32, avg_earn_per_diff_sat: f64, affected_user_ids: &mut HashSet<u32>) -> Result<u32, Box<dyn Error>> {
     let work = db::work_get_for_estimate_update(conn, birth_time)?;
-    //println!("{len(work)} workitems found for estimation");
+    // println!("{} workitems found for estimation", work.len());
     if work.is_empty() {
         return Ok(0);
     }
@@ -504,9 +504,9 @@ fn iteration(conn: &mut Connection, conn_workstat_ro: &Connection, conn_oceanmgr
     Ok(())
 }
 
-pub fn loop_iterations(conn: &mut Connection, conn_workstat_ro: &Connection, conn_oceanmgr_ro: &Connection) {
+pub fn loop_iterations(conn: &mut Connection, conn_workstat_ro: &Connection, conn_oceanmgr_ro: &Connection) -> Result<(), Box<dyn Error>> {
     // global birth_time
-    let birth_time = env::var("PAYCALC_BIRTH_TIME").unwrap_or("0".to_string()).parse::<u32>().unwrap_or(0);
+    let birth_time = env::var("PAYCALC_BIRTH_TIME").unwrap_or("0".to_string()).parse::<u32>()?;
     let mut status = Status::new(birth_time);
 
     println!("Paycalc/main: loop starting...");
@@ -534,5 +534,6 @@ pub fn loop_iterations(conn: &mut Connection, conn_workstat_ro: &Connection, con
             thread::sleep(Duration::from_secs_f64(to_sleep));
         }
     }
+    // Ok(())
 }
 

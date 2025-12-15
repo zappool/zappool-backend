@@ -1,4 +1,4 @@
-use crate::common::get_db_update_versions_from_args;
+use crate::common_db::get_db_update_versions_from_args;
 use crate::dto_pc::{Block, MinerSnapshot, PayRequest, Payment, Work};
 
 use rusqlite::{Connection, Params, Row, Transaction};
@@ -219,8 +219,8 @@ pub fn get_status(conn: &Connection) -> Result<(i32, u32, u32, i32, u32), Box<dy
     Ok(res)
 }
 
-fn block_from_row(row: &Row) -> Result<Block, rusqlite::Error> {
-    // println!("block_from_row {0:?}", row);
+fn _block_from_row(row: &Row) -> Result<Block, rusqlite::Error> {
+    // println!("_block_from_row {0:?}", row);
     let b = Block::new(
         row.get::<_, u32>(0)?,
         row.get::<_, String>(1)?,
@@ -228,7 +228,7 @@ fn block_from_row(row: &Row) -> Result<Block, rusqlite::Error> {
         row.get::<_, u32>(3)?,
         row.get::<_, u64>(4)?,
     );
-    // println!("block_from_row {0}", b.block_hash);
+    // println!("_block_from_row {0}", b.block_hash);
     Ok(b)
 }
 
@@ -306,8 +306,9 @@ pub fn userlookup_get_string(conn: &Connection, id: u32) -> Result<String, Box<d
     return Ok("?".to_string())
 }
 
-// Note: It doesn't commit
-pub fn insert_work_struct_nocommit(conn: &Transaction, mut w: Work) -> Result<usize, Box<dyn Error>> {
+/// Updates username IDs if unset
+/// Note: It doesn't commit
+pub fn insert_work_struct_nocommit(conn: &Transaction, mut w: Work) -> Result<(Work, usize), Box<dyn Error>> {
     if w.uname_o_id == 0 {
         w.uname_o_id = userlookup_get_or_insert_id_nocommit(conn, &w.uname_o, 11, w.time_add as u32)?;
     }
@@ -346,33 +347,30 @@ pub fn insert_work_struct_nocommit(conn: &Transaction, mut w: Work) -> Result<us
         (
             w.uname_o_id, w.uname_o_wrkr_id, w.uname_u_id, w.uname_u_wrkr_id,
             w.tdiff, w.time_add,
-            w.payed, w.payed_time, w.payed_ref,
+            w.payed, w.payed_time, &w.payed_ref,
             w.committed, w.commit_blocks, w.commit_first_time, w.commit_next_time, w.estimate
         )
     )?;
-    Ok(cnt)
+    Ok((w, cnt))
 }
 
-pub fn insert_work_struct(conn: &mut Connection, w: Work) -> Result<usize, Box<dyn Error>> {
-    let conntx = conn.transaction()?;
-    let res = insert_work_struct_nocommit(&conntx, w)?;
-    let _ = conntx.commit()?;
-    Ok(res)
-}
-
+// pub fn insert_work_struct(conn: &mut Connection, w: Work) -> Result<usize, Box<dyn Error>> {
+//     let conntx = conn.transaction()?;
+//     let res = insert_work_struct_nocommit(&conntx, w)?;
+//     let _ = conntx.commit()?;
+//     Ok(res)
+// }
 
 pub fn get_work_count(conn: &Connection) -> Result<u32, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT COUNT(*) FROM WORK")?;
-    if let Ok(count) = stmt.query_one((), |row| row.get::<_, u32>(0)) {
-        return Ok(count)
-    }
-    Ok(0)
+    let cnt = stmt.query_one((), |row| Ok(row.get::<_, u32>(0).unwrap_or(0)))?;
+    Ok(cnt)
 }
 
 pub fn work_get_total_committed(conn: &Connection) -> Result<u64, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT SUM(Committed) FROM WORK")?;
     let sum = stmt.query_one((), |row| {
-        row.get::<_, u64>(0)
+        Ok(row.get::<_, u64>(0).unwrap_or(0))
     })?;
     // println!("work_get_total_committed {sum}");
     Ok(sum)
@@ -381,36 +379,29 @@ pub fn work_get_total_committed(conn: &Connection) -> Result<u64, Box<dyn Error>
 pub fn work_get_total_estimated(conn: &Connection) -> Result<u64, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT SUM(Estimate) FROM WORK")?;
     let sum = stmt.query_one((), |row| {
-        row.get::<_, u64>(0)
+        Ok(row.get::<_, u64>(0).unwrap_or(0))
     })?;
     // println!("{sum}")
     Ok(sum)
 }
 
-/*
-def work_get_user_total_committed(cursor: sqlite3.Cursor, user_o_id: int) -> int:
-    cursor.execute("SELECT SUM(Committed) FROM WORK WHERE UNameO == ?", (user_o_id,))
-    rows = cursor.fetchall()
-    sum = 0
-    if len(rows) >= 1:
-        if len(rows[0]) >= 1:
-            if rows[0][0] != None:
-                sum = rows[0][0]
-    # print(sum)
-    return sum
+pub fn work_get_user_total_committed(conn: &Connection, user_o_id: u32) -> Result<u64, Box<dyn Error>> {
+    let mut stmt = conn.prepare("SELECT SUM(Committed) FROM WORK WHERE UNameO == ?1;")?;
+    let sum = stmt.query_one((user_o_id,), |row| {
+        Ok(row.get::<_, u64>(0).unwrap_or(0))
+    })?;
+    // println!("sum {:?}", sum);
+    Ok(sum)
+}
 
-
-def work_get_user_total_estimated(cursor: sqlite3.Cursor, user_o_id: int) -> int:
-    cursor.execute("SELECT SUM(Estimate) FROM WORK WHERE UNameO == ?", (user_o_id,))
-    rows = cursor.fetchall()
-    sum = 0
-    if len(rows) >= 1:
-        if len(rows[0]) >= 1:
-            if rows[0][0] != None:
-                sum = rows[0][0]
-    # print(sum)
-    return sum
-*/
+pub fn work_get_user_total_estimated(conn: &Connection, user_o_id: u32) -> Result<u64, Box<dyn Error>> {
+    let mut stmt = conn.prepare("SELECT SUM(Estimate) FROM WORK WHERE UNameO == ?1")?;
+    let sum = stmt.query_one((user_o_id,), |row| {
+        Ok(row.get::<_, u64>(0).unwrap_or(0))
+    })?;
+    // println!("{}", sum);
+    Ok(sum)
+}
 
 pub fn work_update_nocommit(conntx: &Transaction, w: &Work) -> Result<(), Box<dyn Error>> {
     let _ = conntx.execute(
@@ -657,7 +648,7 @@ pub fn block_get_new_blocks(conn: &Connection, old_time: u32) -> Result<Vec<Bloc
             FROM PC_BLOCK \
             WHERE Time > ?1 \
             ORDER BY Time ASC")?;
-    let vector = stmt.query_map((old_time,), |row| block_from_row(row))?
+    let vector = stmt.query_map((old_time,), |row| _block_from_row(row))?
         .filter(|blr| blr.is_ok())
         .map(|blr| blr.unwrap())
         .collect::<Vec<Block>>();
@@ -667,7 +658,7 @@ pub fn block_get_new_blocks(conn: &Connection, old_time: u32) -> Result<Vec<Bloc
 pub fn block_get_total_earn(conn: &Connection) -> Result<u64, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT SUM(Earning) FROM PC_BLOCK")?;
     let sum = stmt.query_one((), |row| {
-        row.get::<_, u64>(0)
+        Ok(row.get::<_, u64>(0).unwrap_or(0))
     })?;
     Ok(sum)
 }
@@ -676,7 +667,7 @@ pub fn block_get_total_earned(conn: &Connection) -> Result<u64, Box<dyn Error>> 
     let mut stmt = conn.prepare("SELECT SUM(Earning) FROM PC_BLOCK")?;
 
     let res = stmt.query_one((), |row| {
-        row.get::<_, u64>(0)
+        Ok(row.get::<_, u64>(0).unwrap_or(0))
     })?;
     Ok(res)
 }
@@ -721,8 +712,8 @@ pub fn block_get_last_avg_n(conn: &Connection, last_block_count: u32) -> Result<
             FROM PC_BLOCK \
             WHERE Time >= ?1")?;
     let (sum_earn, sum_diff) = stmt2.query_one((last_block_time,), |row| Ok((
-        row.get::<_, u64>(0)?,
-        row.get::<_, u64>(0)?,
+        row.get::<_, u64>(0).unwrap_or(0),
+        row.get::<_, u64>(1).unwrap_or(0),
     )))?;
     Ok((sum_earn, sum_diff))
 }
@@ -762,45 +753,80 @@ pub fn miner_ss_insert_nocommit(conn: &Connection, ss: &MinerSnapshot) -> Result
     Ok(())
 }
 
+pub fn miner_ss_get_all(conn: &Connection) -> Result<Vec<MinerSnapshot>, Box<dyn Error>> {
+    let mut stmt = conn.prepare(
+        "SELECT UserId, UserS, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId \
+        FROM MINER_SS \
+        ORDER BY UserId ASC")?;
+    let res = stmt.query_map((), |row| {
+        Ok(MinerSnapshot::new(
+            row.get::<_, u32>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, u32>(2)?,
+            row.get::<_, u64>(3)?,
+            row.get::<_, u64>(4)?,
+            row.get::<_, u64>(5)?,
+            row.get::<_, u64>(6)?,
+            row.get::<_, u64>(7)?,
+            row.get::<_, i32>(8)?,
+        ))
+    })?
+        .filter(|res| res.is_ok())
+        .map(|res| res.unwrap())
+        .collect::<Vec<MinerSnapshot>>();
+    Ok(res)
+}
+
+fn _pays_from_raw(row: &Row) -> Result<(PayRequest, Payment), rusqlite::Error> {
+    let pr = PayRequest::new(
+        row.get::<_, i32>(0)?,
+        row.get::<_, u32>(1)?,
+        row.get::<_, u64>(2)?,
+        row.get::<_, String>(3)?,
+        row.get::<_, String>(4)?,
+        row.get::<_, u32>(5)?,
+    );
+    let paym = Payment::new(
+        row.get::<_, i32>(6)?,
+        row.get::<_, i32>(7)?,
+        row.get::<_, u32>(8)?,
+        row.get::<_, u8>(9)?,
+        row.get::<_, u32>(10)?,
+        row.get::<_, u8>(11)?,
+        row.get::<_, String>(12)?,
+        row.get::<_, u8>(13)?,
+        row.get::<_, u32>(14)?,
+        row.get::<_, String>(15)?,
+        row.get::<_, String>(16)?,
+        row.get::<_, u64>(17)?,
+        row.get::<_, u32>(18)?,
+        row.get::<_, u32>(19)?,
+        row.get::<_, String>(20)?,
+    );
+    Ok((pr, paym))
+}
+
+/// Return Id
+pub fn payreq_insert_nocommit(conn: &Transaction, pr: &PayRequest) -> Result<u32, Box<dyn Error>> {
+    let mut stmt = conn.prepare(
+        "INSERT INTO PAYREQ \
+        (MinerId, ReqAmnt, PayMethod, PriId, ReqTime) \
+        VALUES (?1, ?2, ?3, ?4, ?5) \
+        RETURNING Id")?;
+    let mut rows = stmt.query((pr.miner_id, pr.req_amnt, &pr.pay_method, &pr.pri_id, pr.req_time))?;
+    if let Ok(Some(row)) = rows.next() {
+        if let Ok(id) = row.get::<_, u32>(0) {
+            return Ok(id);
+        }
+    }
+    Err(format!("ERROR Could not insert pay request {} {} {}", pr.miner_id, pr.pri_id, pr.req_amnt).into())
+}
+
 /*
-def miner_ss_get_all(conn: sqlite3.Connection) -> list[MinerSnapshot]:
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT UserId, UserS, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId 
-        FROM MINER_SS
-        ORDER BY UserId ASC
-    """)
-    rows = cursor.fetchall()
-    res = []
-    for r in rows:
-        if len(r) >= 9:
-            ss = MinerSnapshot(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8])
-            res.append(ss)
-    cursor.close()
-    return res
-
-
-# Return Id
-def payreq_insert_nocommit(cursor: sqlite3.Cursor, pr: PayRequest) -> int:
-    cursor.execute("""
-        INSERT INTO PAYREQ
-        (MinerId, ReqAmnt, PayMethod, PriId, ReqTime)
-        VALUES (?, ?, ?, ?, ?)
-        RETURNING Id
-        """,
-        (pr.miner_id, pr.req_amnt, pr.pay_method, pr.pri_id, pr.req_time))
-    rows = cursor.fetchall()
-    if len(rows) >= 1:
-        row = rows[0]
-        if len(row) >= 1:
-            return row[0]
-    raise Exception(f"ERROR Could not insert pay request {pr.miner_id} {pr.pri_id} {pr.req_amnt}")
-
-
 def payreq_get_all(conn: sqlite3.Connection) -> list[PayRequest]:
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT Id, MinerId, ReqAmnt, PayMethod, PriId, ReqTime 
+        SELECT Id, MinerId, ReqAmnt, PayMethod, PriId, ReqTime
         FROM PAYREQ
         ORDER BY ReqTime ASC
     """)
@@ -817,7 +843,7 @@ def payreq_get_all(conn: sqlite3.Connection) -> list[PayRequest]:
 def payreq_get_id(conn: sqlite3.Connection, id: int) -> PayRequest:
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT Id, MinerId, ReqAmnt, PayMethod, PriId, ReqTime 
+        SELECT Id, MinerId, ReqAmnt, PayMethod, PriId, ReqTime
         FROM PAYREQ
         WHERE Id = ?
         LIMIT 1
@@ -831,32 +857,29 @@ def payreq_get_id(conn: sqlite3.Connection, id: int) -> PayRequest:
     pr = PayRequest(r[0], r[1], r[2], r[3], r[4], r[5])
     cursor.close()
     return pr
+*/
 
+// Get all payrequests that are non-final (open): all except those for which a Payment
+// with final state (2 SuccessFinal or 4 FailedFinal) exists.
+pub fn payreq_get_all_non_final(conn: &Connection) -> Result<Vec<(PayRequest, Payment)>, Box<dyn Error>> {
+    let mut stmt = conn.prepare(
+        "SELECT \
+        PAYREQ.Id, PAYREQ.MinerId, PAYREQ.ReqAmnt, PAYREQ.PayMethod, PAYREQ.PriId, PAYREQ.ReqTime, \
+        PAYMENT.Id, PAYMENT.ReqId, PAYMENT.CreateTime, PAYMENT.Status, PAYMENT.StatusTime, PAYMENT.ErrorCode, PAYMENT.ErrorStr, PAYMENT.RetryCnt, PAYMENT.FailTime, PAYMENT.SeconId, PAYMENT.TertiId, PAYMENT.PaidAmnt, PAYMENT.PaidFee, PAYMENT.PayTime, PAYMENT.PayRef \
+        FROM PAYREQ \
+        LEFT OUTER JOIN PAYMENT ON PAYREQ.Id = PAYMENT.ReqId \
+        WHERE (PAYMENT.Status IS NULL OR (PAYMENT.Status != 2 AND PAYMENT.Status != 4)) \
+        ORDER BY PAYREQ.ReqTime ASC")?;
+    let res = stmt.query_map((), |row| {
+        _pays_from_raw(row)
+    })?
+        .filter(|res| res.is_ok())
+        .map(|res| res.unwrap())
+        .collect::<Vec<(PayRequest, Payment)>>();
+    Ok(res)
+}
 
-# Get all payrequests that are non-final (open): all except those for which a Payment
-# with final state (2 SuccessFinal or 4 FailedFinal) exists.
-def payreq_get_all_non_final(conn: sqlite3.Connection) -> list[tuple[PayRequest, Payment]]:
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT
-        PAYREQ.Id, PAYREQ.MinerId, PAYREQ.ReqAmnt, PAYREQ.PayMethod, PAYREQ.PriId, PAYREQ.ReqTime,
-        PAYMENT.Id, PAYMENT.ReqId, PAYMENT.CreateTime, PAYMENT.Status, PAYMENT.StatusTime, PAYMENT.ErrorCode, PAYMENT.ErrorStr, PAYMENT.RetryCnt, PAYMENT.FailTime, PAYMENT.SeconId, PAYMENT.TertiId, PAYMENT.PaidAmnt, PAYMENT.PaidFee, PAYMENT.PayTime, PAYMENT.PayRef
-        FROM PAYREQ
-        LEFT OUTER JOIN PAYMENT ON PAYREQ.Id = PAYMENT.ReqId
-        WHERE (PAYMENT.Status IS NULL OR (PAYMENT.Status != 2 AND PAYMENT.Status != 4))
-        ORDER BY PAYREQ.ReqTime ASC
-    """)
-    rows = cursor.fetchall()
-    res = []
-    for r in rows:
-        if len(r) >= 21:
-            pr = PayRequest(r[0], r[1], r[2], r[3], r[4], r[5])
-            paym = Payment(r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16], r[17], r[18], r[19], r[20])
-            res.append([pr, paym])
-    cursor.close()
-    return res
-
-
+/*
 # Return Id
 def payment_insert_nocommit(cursor: sqlite3.Cursor, p: Payment):
     cursor.execute("""
@@ -901,44 +924,41 @@ def payment_update_or_insert_nocommit(cursor: sqlite3.Cursor, p: Payment) -> int
         raise Exception(f"Could not insert into payment, {p.id} {p.req_id}")
     else:
         return p.id
+*/
 
+/// Get the total paid amount to a miner,
+/// successful ones and also including request-only, NotTried, InProgress and NonfinalFailure
+/// (excluding FinalFailure)
+/// Uses PAYREQ and PAYMENT
+pub fn payment_get_total_paid_to_miner(conn: &Connection, miner_id: u32) -> Result<u64, Box<dyn Error>> {
+    // // Debug
+    // if False:
+    //     cursor.execute("""
+    //         SELECT PAYREQ.MinerId, PAYREQ.Id, PAYMENT.ReqId, PAYMENT.PaidAmnt, PAYMENT.Status
+    //         FROM PAYREQ
+    //         LEFT OUTER JOIN PAYMENT
+    //         ON PAYREQ.Id = PAYMENT.ReqId
+    //         WHERE PAYREQ.MinerId = ?
+    //         AND (PAYMENT.Status IS NULL OR PAYMENT.Status != 4)
+    //     """, (miner_id,))
+    //     rows = cursor.fetchall()
+    //     print(f"QQQ {rows}")
 
-# Get the total paid amount to a miner,
-# successful ones and also including request-only, NotTried, InProgress and NonfinalFailure
-# (excluding FinalFailure)
-# Uses PAYREQ and PAYMENT
-def payment_get_total_paid_to_miner(cursor: sqlite3.Cursor, miner_id: int) -> int:
-    # # Debug
-    # if False:
-    #     cursor.execute("""
-    #         SELECT PAYREQ.MinerId, PAYREQ.Id, PAYMENT.ReqId, PAYMENT.PaidAmnt, PAYMENT.Status
-    #         FROM PAYREQ
-    #         LEFT OUTER JOIN PAYMENT
-    #         ON PAYREQ.Id = PAYMENT.ReqId
-    #         WHERE PAYREQ.MinerId = ?
-    #         AND (PAYMENT.Status IS NULL OR PAYMENT.Status != 4)
-    #     """, (miner_id,))
-    #     rows = cursor.fetchall()
-    #     print(f"QQQ {rows}")
+    let mut stmt = conn.prepare(
+        "SELECT SUM(PAYMENT.PaidAmnt) \
+        FROM PAYREQ \
+        LEFT OUTER JOIN PAYMENT \
+        ON PAYREQ.Id = PAYMENT.ReqId \
+        WHERE PAYREQ.MinerId = ?1 \
+        AND (PAYMENT.Status IS NULL OR PAYMENT.Status != 4)")?;
+    let sum = stmt.query_one((miner_id,), |row| {
+        Ok(row.get::<_, u64>(0).unwrap_or(0))
+    })?;
+    //println!("{}", sum);
+    Ok(sum)
+}
 
-    cursor.execute("""
-        SELECT SUM(PAYMENT.PaidAmnt)
-        FROM PAYREQ
-        LEFT OUTER JOIN PAYMENT
-        ON PAYREQ.Id = PAYMENT.ReqId
-        WHERE PAYREQ.MinerId = ?
-        AND (PAYMENT.Status IS NULL OR PAYMENT.Status != 4)
-    """, (miner_id,))
-    rows = cursor.fetchall()
-    # print(f"{rows}")
-    sum = 0
-    if len(rows) >= 1:
-        if len(rows[0]) >= 1:
-            if rows[0][0] != None:
-                sum = rows[0][0]
-    return sum
-
-
+/*
 # def payment_get_latest_update_time(cursor: sqlite3.Cursor) -> int:
 #     cursor.execute("""
 #         SELECT StatusTime
@@ -956,7 +976,7 @@ def payment_get_total_paid_to_miner(cursor: sqlite3.Cursor, miner_id: int) -> in
 
 // Get all payments updated after a certain time
 // Time comparison is strict
-pub fn payment_get_all_after_time(conn: &Connection, time: u32) -> Result<Vec<(Payment, PayRequest)>, Box<dyn Error>> {
+pub fn payment_get_all_after_time(conn: &Connection, time: u32) -> Result<Vec<(PayRequest, Payment)>, Box<dyn Error>> {
     let mut stmt = conn.prepare(
         "SELECT \
             PAYREQ.Id, PAYREQ.MinerId, PAYREQ.ReqAmnt, PAYREQ.PayMethod, PAYREQ.PriId, PAYREQ.ReqTime, \
@@ -966,36 +986,11 @@ pub fn payment_get_all_after_time(conn: &Connection, time: u32) -> Result<Vec<(P
             WHERE PAYMENT.StatusTime > ?1 \
             ORDER BY PAYMENT.StatusTime ASC")?;
     let res = stmt.query_map((time,), |row| {
-        let pr = PayRequest::new(
-            row.get::<_, i32>(0)?,
-            row.get::<_, u32>(1)?,
-            row.get::<_, u64>(2)?,
-            row.get::<_, String>(3)?,
-            row.get::<_, String>(4)?,
-            row.get::<_, u32>(5)?,
-        );
-        let paym = Payment::new(
-            row.get::<_, i32>(6)?,
-            row.get::<_, i32>(7)?,
-            row.get::<_, u32>(8)?,
-            row.get::<_, u8>(9)?,
-            row.get::<_, u32>(10)?,
-            row.get::<_, u8>(11)?,
-            row.get::<_, String>(12)?,
-            row.get::<_, u8>(13)?,
-            row.get::<_, u32>(14)?,
-            row.get::<_, String>(15)?,
-            row.get::<_, String>(16)?,
-            row.get::<_, u64>(17)?,
-            row.get::<_, u32>(18)?,
-            row.get::<_, u32>(19)?,
-            row.get::<_, String>(20)?,
-        );
-        Ok((paym, pr))
+        _pays_from_raw(row)
     })?
         .filter(|res| res.is_ok())
         .map(|res| res.unwrap())
-        .collect::<Vec<(Payment, PayRequest)>>();
+        .collect::<Vec<(PayRequest, Payment)>>();
     Ok(res)
 }
 

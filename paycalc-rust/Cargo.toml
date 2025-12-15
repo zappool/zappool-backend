@@ -17,6 +17,10 @@ name = "__setup_db"
 path = "src/__setup_db/main.rs"
 
 [[bin]]
+name = "main_dashboard"
+path = "src/main_dashboard/main.rs"
+
+[[bin]]
 name = "main_list_work"
 path = "src/main_list_work/main.rs"
 
@@ -24,6 +28,9 @@ path = "src/main_list_work/main.rs"
 paycalc_rust = 0.1
 
 [__setub_db.dependencies]
+paycalc_rust = 0.1
+
+[main_dashboard.dependencies]
 paycalc_rust = 0.1
 
 [main_list_work.dependencies]

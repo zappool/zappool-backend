@@ -125,6 +125,7 @@ impl ToString for Block {
 // A snapshot a miner at a given time.
 // Miner is the base miner username (without worker name)
 // Amounts in Msat
+#[derive(Clone)]
 pub struct MinerSnapshot {
     pub user_id: u32,
     pub user_s: String,
@@ -155,6 +156,7 @@ impl MinerSnapshot {
     }
 }
 
+#[derive(Clone)]
 pub struct PayRequest {
     pub id: i32,
     pub miner_id: u32,

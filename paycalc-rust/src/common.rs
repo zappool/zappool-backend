@@ -1,77 +1,48 @@
-use dotenv;
-use rusqlite::Connection;
-use rusqlite::OpenFlags;
-use std::env;
-use std::error::Error;
-use std::fs;
+/// Payment methods:
+pub struct PaymentMethod {}
 
-// Return the data dir: the first arg or "."
-pub fn get_data_dir() -> String {
-    // Load environment variables from .env file
-    dotenv::dotenv().ok();
+impl PaymentMethod {
+    /// Lightning Address: Lightning Address -> Lightning payment
+    pub const PAYMENT_METHOD_LN_ADDRESS: &str = "LNAD";
+    /// Nostr Lightning: NPub -> Nostr Profile -> Lightning Address -> Lightning payment
+    pub const PAYMENT_METHOD_NOSTR_LIGHTNING: &str = "NOLN";
+}
 
-    // Read DB_DIR from environment variables
-    match env::var("DB_DIR") {
-        Err(_) => {
-            let local_dir = env::current_dir().unwrap();
-            println!("Using local directory as data dir, ({})", local_dir.to_str().unwrap_or_default());
-            local_dir.to_str().unwrap_or_default().to_string()
-        }
-        Ok(data_dir) => {
-            println!("Using data dir from env: '{data_dir}'");
-            data_dir
+pub struct PaymentResult {
+    pub succcess: bool,
+    pub err_nonfinal: bool,
+    pub err_code: u8,
+    pub err_str: String,
+    pub secon_id: String,
+    pub terti_id: String,
+    pub paid_amount: u64,
+    pub paid_fee: u32,
+    pub reference: String,
+}
+
+impl PaymentResult {
+    pub fn new(succcess: bool, err_nonfinal: bool, err_code: u8, err_str: String, secon_id: String, terti_id: String, paid_amount: u64, paid_fee: u32, reference: String) -> Self {
+        Self {
+            succcess, err_nonfinal, err_code, err_str, secon_id, terti_id, paid_amount, paid_fee, reference,
         }
     }
 }
 
-// Check and return full path of a DB file
-pub fn get_db_file(db_file_name: &str, create_mode: bool) -> String {
-    let data_dir = get_data_dir();
-    let db_file_name = if create_mode {
-        "_new_".to_string() + db_file_name
+// Shorten a string ID by leaving out the middle, for printing
+// E.g.: shorten_id_m_n("npub1xseyc0xgytdu0mdua7gc540reyzlu98n7rcvlz7p3kc6txlauzfqmemekt", 9, 4)
+//  --> "npub1xsey..mekt"
+pub fn shorten_id_m_n(id: &str, prefix_len: u16, postfix_len: u16) -> String {
+    let prefix_len = prefix_len as usize;
+    let postfix_len = postfix_len as usize;
+    let l = prefix_len + 2 + postfix_len;
+    if id.len() <= l {
+        id.to_string()
     } else {
-        db_file_name.to_string()
-    };
-    let dbfile = data_dir + "/" + &db_file_name;
-    if !create_mode {
-        if !fs::exists(&dbfile).unwrap_or(false) {
-            println!("DB file does not exist! {dbfile}");
-            std::process::exit(-1);
-        }
+        format!("{}..{}", &id[..prefix_len], &id[(id.len() - postfix_len)..])
     }
-    println!("Using data file: '{dbfile}'");
-    dbfile
-}
+}   
 
-pub fn get_db_update_versions_from_args(default_to: u8) -> (u8, u8) {
-    let mut vto = default_to;
-    let mut vfrom = vto - 1;
-
-    let args: Vec<String> = env::args().collect();
-    if args.len() >= 3 {
-        if let Ok(x) = args[1].parse::<u8>() {
-            vfrom = x;
-        }
-        if let Ok(x) = args[2].parse::<u8>() {
-            vto = x;
-        }
-    }
-
-    println!("DB update versions: v{vfrom} --> v{vto}");
-    return (vto, vfrom)
-}
-
-fn get_current_db_version(dbfile: &str) -> Result<u8, Box<dyn Error>> {
-    let conn = Connection::open_with_flags(dbfile, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-    let mut stmt = conn.prepare("SELECT Version FROM VERSION LIMIT 1")?;
-    let version = stmt.query_one([], |row| {
-        row.get::<_, u8>(0)
-    })?;
-    Ok(version)
-}
-
-pub fn print_current_db_version(dbfile: &str) {
-    if let Ok(ver) = get_current_db_version(dbfile) {
-        println!("Current DB version: v{ver}  ({dbfile})");
-    }
+// Shorten a string ID by leaving out the middle, for printing
+pub fn shorten_id(id: &str) -> String {
+    shorten_id_m_n(id, 9, 4)
 }

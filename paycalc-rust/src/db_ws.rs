@@ -67,7 +67,7 @@ pub fn get_work_count(conn: &Connection) -> Result<u32, Box<dyn Error>> {
     )?;
 
     let res = stmt.query_one([], |row| {
-        row.get::<_, u32>(0)
+        Ok(row.get::<_, u32>(0).unwrap_or(0))
     })?;
     Ok(res)
 }
