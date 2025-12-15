@@ -21,9 +21,27 @@ pub struct PaymentResult {
 }
 
 impl PaymentResult {
-    pub fn new(succcess: bool, err_nonfinal: bool, err_code: u8, err_str: String, secon_id: String, terti_id: String, paid_amount: u64, paid_fee: u32, reference: String) -> Self {
+    pub fn new(
+        succcess: bool,
+        err_nonfinal: bool,
+        err_code: u8,
+        err_str: String,
+        secon_id: String,
+        terti_id: String,
+        paid_amount: u64,
+        paid_fee: u32,
+        reference: String,
+    ) -> Self {
         Self {
-            succcess, err_nonfinal, err_code, err_str, secon_id, terti_id, paid_amount, paid_fee, reference,
+            succcess,
+            err_nonfinal,
+            err_code,
+            err_str,
+            secon_id,
+            terti_id,
+            paid_amount,
+            paid_fee,
+            reference,
         }
     }
 }
@@ -40,7 +58,7 @@ pub fn shorten_id_m_n(id: &str, prefix_len: u16, postfix_len: u16) -> String {
     } else {
         format!("{}..{}", &id[..prefix_len], &id[(id.len() - postfix_len)..])
     }
-}   
+}
 
 // Shorten a string ID by leaving out the middle, for printing
 pub fn shorten_id(id: &str) -> String {

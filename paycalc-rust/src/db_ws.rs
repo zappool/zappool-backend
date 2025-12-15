@@ -1,8 +1,8 @@
 use crate::dto_ws::Work;
 
 use rusqlite::{Connection, Row};
-use std::vec::Vec;
 use std::error::Error;
+use std::vec::Vec;
 
 fn work_from_row(row: &Row) -> Result<Work, rusqlite::Error> {
     // println!("work_From_row {0:?}", row);
@@ -24,9 +24,13 @@ fn work_from_row(row: &Row) -> Result<Work, rusqlite::Error> {
 /// - start_id: Start after this ID,exclusive
 /// - start_time: Start at this time, inclusive
 /// - limit: limit the number of entries returned (0=unlimited)
-pub fn get_work_after_id(conn: &Connection, start_id: i32, start_time: u32, limit: u32) -> Result<Vec<Work>, Box<dyn Error>> {
-    let query_str =
-        "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout \
+pub fn get_work_after_id(
+    conn: &Connection,
+    start_id: i32,
+    start_time: u32,
+    limit: u32,
+) -> Result<Vec<Work>, Box<dyn Error>> {
+    let query_str = "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout \
         FROM WORK \
         LEFT OUTER JOIN ORUSER \
         ON WORK.UNameO = ORUSER.Id \
@@ -36,10 +40,7 @@ pub fn get_work_after_id(conn: &Connection, start_id: i32, start_time: u32, limi
         ORDER BY WORK.Id ASC ";
 
     let vector = if limit == 0 {
-        let params = [
-            start_id.to_string(),
-            start_time.to_string(),
-        ];
+        let params = [start_id.to_string(), start_time.to_string()];
         let mut stmt = conn.prepare(query_str)?;
         stmt.query_map(params, |row| work_from_row(row))?
             .filter(|wir| wir.is_ok())
@@ -62,13 +63,9 @@ pub fn get_work_after_id(conn: &Connection, start_id: i32, start_time: u32, limi
 }
 
 pub fn get_work_count(conn: &Connection) -> Result<u32, Box<dyn Error>> {
-    let mut stmt = conn.prepare(
-        "SELECT COUNT(*) FROM WORK"
-    )?;
+    let mut stmt = conn.prepare("SELECT COUNT(*) FROM WORK")?;
 
-    let res = stmt.query_one([], |row| {
-        Ok(row.get::<_, u32>(0).unwrap_or(0))
-    })?;
+    let res = stmt.query_one([], |row| Ok(row.get::<_, u32>(0).unwrap_or(0)))?;
     Ok(res)
 }
 
@@ -104,7 +101,7 @@ mod tests {
                 FOREIGN KEY (UNameO) REFERENCES ORUSER(Id) \
                 FOREIGN KEY (UNameU) REFERENCES USUSER(Id) \
             );",
-            []
+            [],
         )?;
         let _ = conn.execute("CREATE INDEX WorkTimeAdd ON WORK (TimeAdd);", [])?;
         Ok(())
@@ -114,7 +111,10 @@ mod tests {
         // Create a test database with WORK table
         db_setup_1(&conn)?;
         conn.execute("INSERT INTO ORUSER (Id, UNameO, UNameO_wrkr, UNameU_wrkr, TimeAdd) VALUES (11, 'uname_o_11', 'wrk11', 'uname_u_11', 100);", [])?;
-        conn.execute("INSERT INTO USUSER (Id, UNameU, TimeAdd) VALUES (12, 'uname_u_12', 100);", [])?;
+        conn.execute(
+            "INSERT INTO USUSER (Id, UNameU, TimeAdd) VALUES (12, 'uname_u_12', 100);",
+            [],
+        )?;
         for i in 0..5 {
             let time_add = 1_000_000 + i * 1_000;
             conn.execute("INSERT INTO WORK (UNameO, UNameU, TDiff, TimeAdd, TimeCalc, CalcPayout) VALUES (11, 12, 131072, ?1, 0, 0);", [time_add.to_string()])?;
@@ -145,19 +145,23 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         create_test_db(&conn).unwrap();
 
-        { // all
+        {
+            // all
             let count = get_work_after_id(&conn, 0, 1, 0).unwrap();
             assert_eq!(count.iter().len(), 5);
         }
-        { // later ID
+        {
+            // later ID
             let count = get_work_after_id(&conn, 2, 1, 0).unwrap();
             assert_eq!(count.iter().len(), 3);
         }
-        { // later time
+        {
+            // later time
             let count = get_work_after_id(&conn, 0, 1_002_500, 0).unwrap();
             assert_eq!(count.iter().len(), 2);
         }
-        { // limit
+        {
+            // limit
             let count = get_work_after_id(&conn, 0, 1, 2).unwrap();
             assert_eq!(count.iter().len(), 2);
         }

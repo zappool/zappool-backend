@@ -14,7 +14,11 @@ pub fn db_setup(conn: &Connection) -> Result<(), Box<dyn Error>> {
 }
 
 // Upgrade from an older version, versions have default values
-fn db_setup_from_to(conn: &Connection, vfrom: Option<u8>, vto: Option<u8>) -> Result<(), Box<dyn Error>> {
+fn db_setup_from_to(
+    conn: &Connection,
+    vfrom: Option<u8>,
+    vto: Option<u8>,
+) -> Result<(), Box<dyn Error>> {
     let vfrom = vfrom.unwrap_or(0);
     let vto = vto.unwrap_or(LATEST_DB_VERSION);
     println!("Updating DB from v{vfrom} to v{vto}");
@@ -40,7 +44,8 @@ fn db_update_0_3(conn: &Connection) -> Result<(), Box<dyn Error>> {
             LastBlockRetrvd INTEGER, \
             LastBlockProcd INTEGER, \
             LastPaymentProcd INTEGER)",
-        [])?;
+        [],
+    )?;
     let _ = conn.execute(
         "INSERT INTO STATUS \
                 (LastWorkItemRetrvd, LastWorkItemTimeRetrvd, LastBlockRetrvd, LastBlockProcd, LastPaymentProcd) \
@@ -95,7 +100,8 @@ fn db_update_0_3(conn: &Connection) -> Result<(), Box<dyn Error>> {
             FOREIGN KEY (UNameOWrkr) REFERENCES USERLOOKUP(Id), \
             FOREIGN KEY (UNameU) REFERENCES USERLOOKUP(Id) \
             FOREIGN KEY (UNameUWrkr) REFERENCES USERLOOKUP(Id))",
-        [])?;
+        [],
+    )?;
     let _ = conn.execute("CREATE INDEX WorkTimeAdd ON WORK (TimeAdd)", [])?;
 
     let _ = conn.execute(
@@ -107,7 +113,8 @@ fn db_update_0_3(conn: &Connection) -> Result<(), Box<dyn Error>> {
             TimeAddedFirst INTEGER, \
             TimeUpdated INTEGER, \
             AccTotalDiff INTEGER)",
-        [])?;
+        [],
+    )?;
     let _ = conn.execute("CREATE INDEX OcBlockEarnTime ON PC_BLOCK (Time)", [])?;
 
     // Create table MINER_SS (Snapshot)
@@ -132,7 +139,8 @@ fn db_update_0_3(conn: &Connection) -> Result<(), Box<dyn Error>> {
             Unpaid INTEGER, \
             UnpaidCons INTEGER, \
             PayReqId INTEGER)",
-            [])?;
+        [],
+    )?;
     let _ = conn.execute("CREATE INDEX MinerSSUserId ON MINER_SS (UserId)", [])?;
     let _ = conn.execute("CREATE INDEX MinerSSUserS ON MINER_SS (UserS)", [])?;
 
@@ -148,7 +156,8 @@ fn db_update_0_3(conn: &Connection) -> Result<(), Box<dyn Error>> {
             Unpaid INTEGER, \
             UnpaidCons INTEGER, \
             PayReqId INTEGER)",
-        [])?;
+        [],
+    )?;
     let _ = conn.execute("CREATE INDEX MinerHistUserId ON MINER_SS_HIST (UserId)", [])?;
     let _ = conn.execute("CREATE INDEX MinerHistTime ON MINER_SS_HIST (Time)", [])?;
 
@@ -164,7 +173,8 @@ fn db_update_0_3(conn: &Connection) -> Result<(), Box<dyn Error>> {
             PayMethod VARCHAR(10), \
             PriId VARCHAR(200), \
             ReqTime INTEGER)",
-        [])?;
+        [],
+    )?;
     let _ = conn.execute("CREATE INDEX PayreqId ON PAYREQ (Id)", [])?;
     let _ = conn.execute("CREATE INDEX PayreqTime ON PAYREQ (ReqTime)", [])?;
 
@@ -191,7 +201,8 @@ fn db_update_0_3(conn: &Connection) -> Result<(), Box<dyn Error>> {
             SeconId VARCHAR(1000), \
             TertiId VARCHAR(1000), \
             FOREIGN KEY (ReqId) REFERENCES PAYREQ(Id))",
-        [])?;
+        [],
+    )?;
     let _ = conn.execute("CREATE INDEX PaymentId ON PAYMENT (Id)", [])?;
     let _ = conn.execute("CREATE INDEX PaymentReqId ON PAYMENT (ReqId)", [])?;
     let _ = conn.execute("CREATE INDEX PaymentStatusTime ON PAYMENT (StatusTime)", [])?;
@@ -233,50 +244,66 @@ fn _block_from_row(row: &Row) -> Result<Block, rusqlite::Error> {
 }
 
 // Doesn't commit
-pub fn set_status_last_workitem_retrvd(conntx: &Transaction, newval: i32, new_time_val: u32) -> Result<(), Box<dyn Error>> {
+pub fn set_status_last_workitem_retrvd(
+    conntx: &Transaction,
+    newval: i32,
+    new_time_val: u32,
+) -> Result<(), Box<dyn Error>> {
     let _ = conntx.execute(
         "UPDATE STATUS SET LastWorkItemRetrvd = ?1, LastWorkItemTimeRetrvd = ?2",
-        [newval, new_time_val as i32])?;
+        [newval, new_time_val as i32],
+    )?;
     Ok(())
 }
 
 // Doesn't commit
-pub fn set_status_last_block_retrvd(conntx: &Transaction, newval: u32) -> Result<(), Box<dyn Error>> {
-    let _ = conntx.execute(
-        "UPDATE STATUS SET LastBlockRetrvd = ?1",
-        (newval,))?;
+pub fn set_status_last_block_retrvd(
+    conntx: &Transaction,
+    newval: u32,
+) -> Result<(), Box<dyn Error>> {
+    let _ = conntx.execute("UPDATE STATUS SET LastBlockRetrvd = ?1", (newval,))?;
     Ok(())
 }
 
 // Doesn't commit
-pub fn set_status_last_block_procd(conntx: &Transaction, newval: u32) -> Result<(), Box<dyn Error>> {
-    let _ = conntx.execute(
-        "UPDATE STATUS SET LastBlockProcd = ?1",
-        (newval,))?;
+pub fn set_status_last_block_procd(
+    conntx: &Transaction,
+    newval: u32,
+) -> Result<(), Box<dyn Error>> {
+    let _ = conntx.execute("UPDATE STATUS SET LastBlockProcd = ?1", (newval,))?;
     Ok(())
 }
 
 // Doesn't commit
-pub fn set_status_last_payment_procd(conntx: &Transaction, newval: u32) -> Result<(), Box<dyn Error>> {
-    let _ = conntx.execute(
-        "UPDATE STATUS SET LastPaymentProcd = ?1",
-        (newval,))?;
+pub fn set_status_last_payment_procd(
+    conntx: &Transaction,
+    newval: u32,
+) -> Result<(), Box<dyn Error>> {
+    let _ = conntx.execute("UPDATE STATUS SET LastPaymentProcd = ?1", (newval,))?;
     Ok(())
 }
 
 // Get Id of a username string, return Id, or None if not found
-pub fn userlookup_get_id(conn: &Connection, username_string: &str) -> Result<Option<u32>, Box<dyn Error>> {
+pub fn userlookup_get_id(
+    conn: &Connection,
+    username_string: &str,
+) -> Result<Option<u32>, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT Id FROM USERLOOKUP WHERE String = ?1")?;
     if let Ok(id) = stmt.query_one((username_string,), |row| row.get::<_, u32>(0)) {
         // found in DB
-        return Ok(Some(id))
+        return Ok(Some(id));
     }
-    return Ok(None)
+    return Ok(None);
 }
 
 // Get Id or insert username string, return Id
 // Note: it does'n commit
-fn userlookup_get_or_insert_id_nocommit(conn: &Transaction, username_string: &str, typ: u8, time_add: u32) -> Result<u32, Box<dyn Error>> {
+fn userlookup_get_or_insert_id_nocommit(
+    conn: &Transaction,
+    username_string: &str,
+    typ: u8,
+    time_add: u32,
+) -> Result<u32, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT Id FROM USERLOOKUP WHERE String = ?1")?;
     if let Ok(id) = stmt.query_one([username_string], |row| row.get::<_, u32>(0)) {
         // Found in DB
@@ -289,7 +316,8 @@ fn userlookup_get_or_insert_id_nocommit(conn: &Transaction, username_string: &st
             (String, Type, TimeAdd) \
             VALUES (?1, ?2, ?3) \
             RETURNING Id \
-        ")?;
+        ",
+    )?;
     if let Ok(id) = stmt2.query_one((username_string, typ, time_add), |row| row.get::<_, u32>(0)) {
         // Added to DB
         return Ok(id);
@@ -303,23 +331,30 @@ pub fn userlookup_get_string(conn: &Connection, id: u32) -> Result<String, Box<d
     if let Ok(string) = stmt.query_one((id,), |row| row.get::<_, String>(0)) {
         return Ok(string);
     }
-    return Ok("?".to_string())
+    return Ok("?".to_string());
 }
 
 /// Updates username IDs if unset
 /// Note: It doesn't commit
-pub fn insert_work_struct_nocommit(conn: &Transaction, mut w: Work) -> Result<(Work, usize), Box<dyn Error>> {
+pub fn insert_work_struct_nocommit(
+    conn: &Transaction,
+    mut w: Work,
+) -> Result<(Work, usize), Box<dyn Error>> {
     if w.uname_o_id == 0 {
-        w.uname_o_id = userlookup_get_or_insert_id_nocommit(conn, &w.uname_o, 11, w.time_add as u32)?;
+        w.uname_o_id =
+            userlookup_get_or_insert_id_nocommit(conn, &w.uname_o, 11, w.time_add as u32)?;
     }
     if w.uname_o_wrkr_id == 0 {
-        w.uname_o_wrkr_id = userlookup_get_or_insert_id_nocommit(conn, &w.uname_o_wrkr, 12, w.time_add as u32)?;
+        w.uname_o_wrkr_id =
+            userlookup_get_or_insert_id_nocommit(conn, &w.uname_o_wrkr, 12, w.time_add as u32)?;
     }
     if w.uname_u_id == 0 {
-        w.uname_u_id = userlookup_get_or_insert_id_nocommit(conn, &w.uname_u, 21, w.time_add as u32)?;
+        w.uname_u_id =
+            userlookup_get_or_insert_id_nocommit(conn, &w.uname_u, 21, w.time_add as u32)?;
     }
     if w.uname_u_wrkr_id == 0 {
-        w.uname_u_wrkr_id = userlookup_get_or_insert_id_nocommit(conn, &w.uname_u_wrkr, 22, w.time_add as u32)?;
+        w.uname_u_wrkr_id =
+            userlookup_get_or_insert_id_nocommit(conn, &w.uname_u_wrkr, 22, w.time_add as u32)?;
     }
     // println!("user ids: {} {} {} {}",
     //     w.uname_o_id, w.uname_o_wrkr_id, w.uname_u_id, w.uname_u_wrkr_id);
@@ -345,11 +380,21 @@ pub fn insert_work_struct_nocommit(conn: &Transaction, mut w: Work) -> Result<(W
                     ?10, ?11, ?12, ?13, ?14 \
                 )",
         (
-            w.uname_o_id, w.uname_o_wrkr_id, w.uname_u_id, w.uname_u_wrkr_id,
-            w.tdiff, w.time_add,
-            w.payed, w.payed_time, &w.payed_ref,
-            w.committed, w.commit_blocks, w.commit_first_time, w.commit_next_time, w.estimate
-        )
+            w.uname_o_id,
+            w.uname_o_wrkr_id,
+            w.uname_u_id,
+            w.uname_u_wrkr_id,
+            w.tdiff,
+            w.time_add,
+            w.payed,
+            w.payed_time,
+            &w.payed_ref,
+            w.committed,
+            w.commit_blocks,
+            w.commit_first_time,
+            w.commit_next_time,
+            w.estimate,
+        ),
     )?;
     Ok((w, cnt))
 }
@@ -369,36 +414,34 @@ pub fn get_work_count(conn: &Connection) -> Result<u32, Box<dyn Error>> {
 
 pub fn work_get_total_committed(conn: &Connection) -> Result<u64, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT SUM(Committed) FROM WORK")?;
-    let sum = stmt.query_one((), |row| {
-        Ok(row.get::<_, u64>(0).unwrap_or(0))
-    })?;
+    let sum = stmt.query_one((), |row| Ok(row.get::<_, u64>(0).unwrap_or(0)))?;
     // println!("work_get_total_committed {sum}");
     Ok(sum)
 }
 
 pub fn work_get_total_estimated(conn: &Connection) -> Result<u64, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT SUM(Estimate) FROM WORK")?;
-    let sum = stmt.query_one((), |row| {
-        Ok(row.get::<_, u64>(0).unwrap_or(0))
-    })?;
+    let sum = stmt.query_one((), |row| Ok(row.get::<_, u64>(0).unwrap_or(0)))?;
     // println!("{sum}")
     Ok(sum)
 }
 
-pub fn work_get_user_total_committed(conn: &Connection, user_o_id: u32) -> Result<u64, Box<dyn Error>> {
+pub fn work_get_user_total_committed(
+    conn: &Connection,
+    user_o_id: u32,
+) -> Result<u64, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT SUM(Committed) FROM WORK WHERE UNameO == ?1;")?;
-    let sum = stmt.query_one((user_o_id,), |row| {
-        Ok(row.get::<_, u64>(0).unwrap_or(0))
-    })?;
+    let sum = stmt.query_one((user_o_id,), |row| Ok(row.get::<_, u64>(0).unwrap_or(0)))?;
     // println!("sum {:?}", sum);
     Ok(sum)
 }
 
-pub fn work_get_user_total_estimated(conn: &Connection, user_o_id: u32) -> Result<u64, Box<dyn Error>> {
+pub fn work_get_user_total_estimated(
+    conn: &Connection,
+    user_o_id: u32,
+) -> Result<u64, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT SUM(Estimate) FROM WORK WHERE UNameO == ?1")?;
-    let sum = stmt.query_one((user_o_id,), |row| {
-        Ok(row.get::<_, u64>(0).unwrap_or(0))
-    })?;
+    let sum = stmt.query_one((user_o_id,), |row| Ok(row.get::<_, u64>(0).unwrap_or(0)))?;
     // println!("{}", sum);
     Ok(sum)
 }
@@ -413,22 +456,39 @@ pub fn work_update_nocommit(conntx: &Transaction, w: &Work) -> Result<(), Box<dy
                 CommitNextTime = ?4, \
                 Estimate = ?5 \
             WHERE Id = ?6",
-        (w.committed, w.commit_blocks, w.commit_first_time, w.commit_next_time, w.estimate, w.db_id)
+        (
+            w.committed,
+            w.commit_blocks,
+            w.commit_first_time,
+            w.commit_next_time,
+            w.estimate,
+            w.db_id,
+        ),
     )?;
     Ok(())
 }
 
 // Private
-fn _work_query_custom<P>(conn: &Connection, condition_string: &str, params: P) -> Result<Vec<Work>, Box<dyn Error>> where P: Params {
+fn _work_query_custom<P>(
+    conn: &Connection,
+    condition_string: &str,
+    params: P,
+) -> Result<Vec<Work>, Box<dyn Error>>
+where
+    P: Params,
+{
     let query_str = "SELECT \
         Id, UNameO, UNameOWrkr, UNameU, UNameUWrkr, \
         TDiff, TimeAdd, \
         Payed, PayedTime, PayedRef, \
         Committed, CommitBlocks, CommitFirstTime, CommitNextTime, Estimate \
-        FROM WORK ".to_string() + condition_string;
+        FROM WORK "
+        .to_string()
+        + condition_string;
     let mut stmt = conn.prepare(&query_str)?;
-    let work = stmt.query_map(params, |row| {
-        Ok(Work::new(
+    let work = stmt
+        .query_map(params, |row| {
+            Ok(Work::new(
                 row.get::<_, u32>(0)?,
                 "?".to_string(),
                 "?".to_string(),
@@ -448,9 +508,8 @@ fn _work_query_custom<P>(conn: &Connection, condition_string: &str, params: P) -
                 row.get::<_, u32>(12)?,
                 row.get::<_, u32>(13)?,
                 row.get::<_, u64>(14)?,
-            )
-        )
-    })?
+            ))
+        })?
         .filter(|res| res.is_ok())
         .map(|res| res.unwrap())
         .collect::<Vec<Work>>();
@@ -460,14 +519,19 @@ fn _work_query_custom<P>(conn: &Connection, condition_string: &str, params: P) -
 
 // Return work items that are to be affected by a new block earning
 // Note: usernames are not filled (to save on joins)
-pub fn work_get_affected_by_new_block(conn: &Connection, block_time: u32) -> Result<Vec<Work>, Box<dyn Error>> {
-    _work_query_custom(conn,
+pub fn work_get_affected_by_new_block(
+    conn: &Connection,
+    block_time: u32,
+) -> Result<Vec<Work>, Box<dyn Error>> {
+    _work_query_custom(
+        conn,
         "WHERE \
             CommitBlocks < ?1 AND \
             TimeAdd <= ?2 AND \
             CommitNextTime < ?3 \
             ORDER BY Id ASC",
-        (BLOCKS_WINDOW, block_time, block_time))
+        (BLOCKS_WINDOW, block_time, block_time),
+    )
 }
 
 // Return all work items. Can be slow!
@@ -477,12 +541,17 @@ pub fn work_get_all(conn: &Connection, start_time: u32) -> Result<Vec<Work>, Box
 
 // Get work records whose estimate can be updated,
 // that is, they are not completely accounted for yet
-pub fn work_get_for_estimate_update(conn: &Connection, birth_time: u32) -> Result<Vec<Work>, Box<dyn Error>> {
-    _work_query_custom(conn,
+pub fn work_get_for_estimate_update(
+    conn: &Connection,
+    birth_time: u32,
+) -> Result<Vec<Work>, Box<dyn Error>> {
+    _work_query_custom(
+        conn,
         "WHERE
             CommitBlocks < ?1 AND
             TimeAdd > ?2",
-        (BLOCKS_WINDOW, birth_time,))
+        (BLOCKS_WINDOW, birth_time),
+    )
 }
 
 /*
@@ -641,14 +710,19 @@ def work_device_count_user_period(cursor: sqlite3.Cursor, user_id: str, start_ti
 
 // Get the blocks after a certain time, oldest first.
 // Old time is typically the time of the already processed last block.
-pub fn block_get_new_blocks(conn: &Connection, old_time: u32) -> Result<Vec<Block>, Box<dyn Error>> {
+pub fn block_get_new_blocks(
+    conn: &Connection,
+    old_time: u32,
+) -> Result<Vec<Block>, Box<dyn Error>> {
     let mut stmt = conn.prepare(
         "SELECT \
             Time, BlockHash, Earning, PoolFee, AccTotalDiff \
             FROM PC_BLOCK \
             WHERE Time > ?1 \
-            ORDER BY Time ASC")?;
-    let vector = stmt.query_map((old_time,), |row| _block_from_row(row))?
+            ORDER BY Time ASC",
+    )?;
+    let vector = stmt
+        .query_map((old_time,), |row| _block_from_row(row))?
         .filter(|blr| blr.is_ok())
         .map(|blr| blr.unwrap())
         .collect::<Vec<Block>>();
@@ -657,18 +731,14 @@ pub fn block_get_new_blocks(conn: &Connection, old_time: u32) -> Result<Vec<Bloc
 
 pub fn block_get_total_earn(conn: &Connection) -> Result<u64, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT SUM(Earning) FROM PC_BLOCK")?;
-    let sum = stmt.query_one((), |row| {
-        Ok(row.get::<_, u64>(0).unwrap_or(0))
-    })?;
+    let sum = stmt.query_one((), |row| Ok(row.get::<_, u64>(0).unwrap_or(0)))?;
     Ok(sum)
 }
 
 pub fn block_get_total_earned(conn: &Connection) -> Result<u64, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT SUM(Earning) FROM PC_BLOCK")?;
 
-    let res = stmt.query_one((), |row| {
-        Ok(row.get::<_, u64>(0).unwrap_or(0))
-    })?;
+    let res = stmt.query_one((), |row| Ok(row.get::<_, u64>(0).unwrap_or(0)))?;
     Ok(res)
 }
 
@@ -678,43 +748,63 @@ pub fn block_insert(conntx: &Transaction, block: &Block, now: u32) -> Result<(),
         "INSERT INTO PC_BLOCK \
             (Time, BlockHash, Earning, PoolFee, TimeAddedFirst, TimeUpdated, AccTotalDiff) \
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        (block.time, &block.block_hash, block.earned_sats, block.pool_fee, now, now, block.acc_total_diff))?;
+        (
+            block.time,
+            &block.block_hash,
+            block.earned_sats,
+            block.pool_fee,
+            now,
+            now,
+            block.acc_total_diff,
+        ),
+    )?;
     // println!("inserted");
     Ok(())
 }
 
-pub fn block_update_diff_no_commit(conn: &Connection, block_time: u32, new_acc_total_diff: u64) -> Result<(), Box<dyn Error>> {
+pub fn block_update_diff_no_commit(
+    conn: &Connection,
+    block_time: u32,
+    new_acc_total_diff: u64,
+) -> Result<(), Box<dyn Error>> {
     let _ = conn.execute(
         "UPDATE PC_BLOCK SET AccTotalDiff = ?1 WHERE Time = ?2",
-        (new_acc_total_diff, block_time))?;
+        (new_acc_total_diff, block_time),
+    )?;
     Ok(())
 }
 
-
 // Return the average earnings for the last N blocks.
 // Return a tuple: the sum of earnings and the sum of difficulties
-pub fn block_get_last_avg_n(conn: &Connection, last_block_count: u32) -> Result<(u64, u64), Box<dyn Error>> {
+pub fn block_get_last_avg_n(
+    conn: &Connection,
+    last_block_count: u32,
+) -> Result<(u64, u64), Box<dyn Error>> {
     // First find the N most recent blocks
     // Clamp to 3 -- 100
     let count = std::cmp::max(std::cmp::min(last_block_count, 100), 3);
     let mut stmt = conn.prepare("SELECT Time FROM PC_BLOCK ORDER BY Time DESC LIMIT ?1")?;
-    let times = stmt.query_map((count,), |row| row.get::<_, u32>(0))?
+    let times = stmt
+        .query_map((count,), |row| row.get::<_, u32>(0))?
         .filter(|res| res.is_ok())
         .map(|res| res.unwrap())
         .collect::<Vec<u32>>();
     if times.len() == 0 {
-        return Ok((0, 0))
+        return Ok((0, 0));
     }
     let last_block_time = times[times.len() - 1];
 
     let mut stmt2 = conn.prepare(
         "SELECT SUM(Earning), SUM(AccTotalDiff) \
             FROM PC_BLOCK \
-            WHERE Time >= ?1")?;
-    let (sum_earn, sum_diff) = stmt2.query_one((last_block_time,), |row| Ok((
-        row.get::<_, u64>(0).unwrap_or(0),
-        row.get::<_, u64>(1).unwrap_or(0),
-    )))?;
+            WHERE Time >= ?1",
+    )?;
+    let (sum_earn, sum_diff) = stmt2.query_one((last_block_time,), |row| {
+        Ok((
+            row.get::<_, u64>(0).unwrap_or(0),
+            row.get::<_, u64>(1).unwrap_or(0),
+        ))
+    })?;
     Ok((sum_earn, sum_diff))
 }
 
@@ -725,13 +815,26 @@ pub fn miner_ss_exists(conn: &Connection, id: u32) -> Result<bool, Box<dyn Error
     Ok(exists)
 }
 
-pub fn miner_ss_insert_nocommit(conn: &Connection, ss: &MinerSnapshot) -> Result<(), Box<dyn Error>> {
+pub fn miner_ss_insert_nocommit(
+    conn: &Connection,
+    ss: &MinerSnapshot,
+) -> Result<(), Box<dyn Error>> {
     // History: simply insert
     let _ = conn.execute(
         "INSERT INTO MINER_SS_HIST \
         (UserId, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId) \
         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        (ss.user_id, ss.time, ss.tot_commit, ss.tot_estimate, ss.tot_paid, ss.unpaid, ss.unpaid_cons, ss.payreq_id,))?;
+        (
+            ss.user_id,
+            ss.time,
+            ss.tot_commit,
+            ss.tot_estimate,
+            ss.tot_paid,
+            ss.unpaid,
+            ss.unpaid_cons,
+            ss.payreq_id,
+        ),
+    )?;
 
     // Update-or-add.
     let _ = conn.execute(
@@ -748,7 +851,18 @@ pub fn miner_ss_insert_nocommit(conn: &Connection, ss: &MinerSnapshot) -> Result
             "INSERT INTO MINER_SS \
             (UserId, UserS, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId) \
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            (ss.user_id, &ss.user_s, ss.time, ss.tot_commit, ss.tot_estimate, ss.tot_paid, ss.unpaid, ss.unpaid_cons, ss.payreq_id))?;
+            (
+                ss.user_id,
+                &ss.user_s,
+                ss.time,
+                ss.tot_commit,
+                ss.tot_estimate,
+                ss.tot_paid,
+                ss.unpaid,
+                ss.unpaid_cons,
+                ss.payreq_id,
+            ),
+        )?;
     }
     Ok(())
 }
@@ -757,20 +871,22 @@ pub fn miner_ss_get_all(conn: &Connection) -> Result<Vec<MinerSnapshot>, Box<dyn
     let mut stmt = conn.prepare(
         "SELECT UserId, UserS, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId \
         FROM MINER_SS \
-        ORDER BY UserId ASC")?;
-    let res = stmt.query_map((), |row| {
-        Ok(MinerSnapshot::new(
-            row.get::<_, u32>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, u32>(2)?,
-            row.get::<_, u64>(3)?,
-            row.get::<_, u64>(4)?,
-            row.get::<_, u64>(5)?,
-            row.get::<_, u64>(6)?,
-            row.get::<_, u64>(7)?,
-            row.get::<_, i32>(8)?,
-        ))
-    })?
+        ORDER BY UserId ASC",
+    )?;
+    let res = stmt
+        .query_map((), |row| {
+            Ok(MinerSnapshot::new(
+                row.get::<_, u32>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, u32>(2)?,
+                row.get::<_, u64>(3)?,
+                row.get::<_, u64>(4)?,
+                row.get::<_, u64>(5)?,
+                row.get::<_, u64>(6)?,
+                row.get::<_, u64>(7)?,
+                row.get::<_, i32>(8)?,
+            ))
+        })?
         .filter(|res| res.is_ok())
         .map(|res| res.unwrap())
         .collect::<Vec<MinerSnapshot>>();
@@ -812,14 +928,25 @@ pub fn payreq_insert_nocommit(conn: &Transaction, pr: &PayRequest) -> Result<u32
         "INSERT INTO PAYREQ \
         (MinerId, ReqAmnt, PayMethod, PriId, ReqTime) \
         VALUES (?1, ?2, ?3, ?4, ?5) \
-        RETURNING Id")?;
-    let mut rows = stmt.query((pr.miner_id, pr.req_amnt, &pr.pay_method, &pr.pri_id, pr.req_time))?;
+        RETURNING Id",
+    )?;
+    let mut rows = stmt.query((
+        pr.miner_id,
+        pr.req_amnt,
+        &pr.pay_method,
+        &pr.pri_id,
+        pr.req_time,
+    ))?;
     if let Ok(Some(row)) = rows.next() {
         if let Ok(id) = row.get::<_, u32>(0) {
             return Ok(id);
         }
     }
-    Err(format!("ERROR Could not insert pay request {} {} {}", pr.miner_id, pr.pri_id, pr.req_amnt).into())
+    Err(format!(
+        "ERROR Could not insert pay request {} {} {}",
+        pr.miner_id, pr.pri_id, pr.req_amnt
+    )
+    .into())
 }
 
 /*
@@ -861,7 +988,9 @@ def payreq_get_id(conn: sqlite3.Connection, id: int) -> PayRequest:
 
 // Get all payrequests that are non-final (open): all except those for which a Payment
 // with final state (2 SuccessFinal or 4 FailedFinal) exists.
-pub fn payreq_get_all_non_final(conn: &Connection) -> Result<Vec<(PayRequest, Payment)>, Box<dyn Error>> {
+pub fn payreq_get_all_non_final(
+    conn: &Connection,
+) -> Result<Vec<(PayRequest, Payment)>, Box<dyn Error>> {
     let mut stmt = conn.prepare(
         "SELECT \
         PAYREQ.Id, PAYREQ.MinerId, PAYREQ.ReqAmnt, PAYREQ.PayMethod, PAYREQ.PriId, PAYREQ.ReqTime, \
@@ -870,9 +999,8 @@ pub fn payreq_get_all_non_final(conn: &Connection) -> Result<Vec<(PayRequest, Pa
         LEFT OUTER JOIN PAYMENT ON PAYREQ.Id = PAYMENT.ReqId \
         WHERE (PAYMENT.Status IS NULL OR (PAYMENT.Status != 2 AND PAYMENT.Status != 4)) \
         ORDER BY PAYREQ.ReqTime ASC")?;
-    let res = stmt.query_map((), |row| {
-        _pays_from_raw(row)
-    })?
+    let res = stmt
+        .query_map((), |row| _pays_from_raw(row))?
         .filter(|res| res.is_ok())
         .map(|res| res.unwrap())
         .collect::<Vec<(PayRequest, Payment)>>();
@@ -930,7 +1058,10 @@ def payment_update_or_insert_nocommit(cursor: sqlite3.Cursor, p: Payment) -> int
 /// successful ones and also including request-only, NotTried, InProgress and NonfinalFailure
 /// (excluding FinalFailure)
 /// Uses PAYREQ and PAYMENT
-pub fn payment_get_total_paid_to_miner(conn: &Connection, miner_id: u32) -> Result<u64, Box<dyn Error>> {
+pub fn payment_get_total_paid_to_miner(
+    conn: &Connection,
+    miner_id: u32,
+) -> Result<u64, Box<dyn Error>> {
     // // Debug
     // if False:
     //     cursor.execute("""
@@ -950,10 +1081,9 @@ pub fn payment_get_total_paid_to_miner(conn: &Connection, miner_id: u32) -> Resu
         LEFT OUTER JOIN PAYMENT \
         ON PAYREQ.Id = PAYMENT.ReqId \
         WHERE PAYREQ.MinerId = ?1 \
-        AND (PAYMENT.Status IS NULL OR PAYMENT.Status != 4)")?;
-    let sum = stmt.query_one((miner_id,), |row| {
-        Ok(row.get::<_, u64>(0).unwrap_or(0))
-    })?;
+        AND (PAYMENT.Status IS NULL OR PAYMENT.Status != 4)",
+    )?;
+    let sum = stmt.query_one((miner_id,), |row| Ok(row.get::<_, u64>(0).unwrap_or(0)))?;
     //println!("{}", sum);
     Ok(sum)
 }
@@ -976,7 +1106,10 @@ pub fn payment_get_total_paid_to_miner(conn: &Connection, miner_id: u32) -> Resu
 
 // Get all payments updated after a certain time
 // Time comparison is strict
-pub fn payment_get_all_after_time(conn: &Connection, time: u32) -> Result<Vec<(PayRequest, Payment)>, Box<dyn Error>> {
+pub fn payment_get_all_after_time(
+    conn: &Connection,
+    time: u32,
+) -> Result<Vec<(PayRequest, Payment)>, Box<dyn Error>> {
     let mut stmt = conn.prepare(
         "SELECT \
             PAYREQ.Id, PAYREQ.MinerId, PAYREQ.ReqAmnt, PAYREQ.PayMethod, PAYREQ.PriId, PAYREQ.ReqTime, \
@@ -985,9 +1118,8 @@ pub fn payment_get_all_after_time(conn: &Connection, time: u32) -> Result<Vec<(P
             INNER JOIN PAYREQ ON PAYMENT.ReqId = PAYREQ.Id \
             WHERE PAYMENT.StatusTime > ?1 \
             ORDER BY PAYMENT.StatusTime ASC")?;
-    let res = stmt.query_map((time,), |row| {
-        _pays_from_raw(row)
-    })?
+    let res = stmt
+        .query_map((time,), |row| _pays_from_raw(row))?
         .filter(|res| res.is_ok())
         .map(|res| res.unwrap())
         .collect::<Vec<(PayRequest, Payment)>>();
@@ -1055,7 +1187,7 @@ def payment_get_total_amount_for_user(conn: sqlite3.Connection, user_id: int) ->
     return None
  */
 
- #[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use rusqlite::Connection;
@@ -1071,13 +1203,14 @@ mod tests {
         let mut conn = Connection::open_in_memory()?;
         create_test_db(&conn)?;
 
-        { // get values
+        {
+            // get values
             let (
                 last_workitem_retrvd,
                 last_block_retrvd,
                 last_block_procd,
                 last_payment_procd,
-                last_workitem_time_retrvd
+                last_workitem_time_retrvd,
             ) = get_status(&conn).unwrap();
             assert_eq!(last_workitem_retrvd, -1);
             assert_eq!(last_workitem_time_retrvd, 0);
@@ -1087,8 +1220,10 @@ mod tests {
         }
         let tx = conn.transaction().unwrap();
         let _ = set_status_last_workitem_retrvd(&tx, 4, 3000).unwrap();
-        { // get values
-            let (last_workitem_retrvd, _, _, _, last_workitem_time_retrvd) = get_status(&tx).unwrap();
+        {
+            // get values
+            let (last_workitem_retrvd, _, _, _, last_workitem_time_retrvd) =
+                get_status(&tx).unwrap();
             assert_eq!(last_workitem_retrvd, 4);
             assert_eq!(last_workitem_time_retrvd, 3000);
         }

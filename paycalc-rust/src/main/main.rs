@@ -16,20 +16,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     // println!("DB_DIR: {}", db_dir);
 
     let dbfile_workstat = get_db_file("workstat.db", false);
-    let conn_workstat_ro = Connection::open_with_flags(dbfile_workstat, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let conn_workstat_ro =
+        Connection::open_with_flags(dbfile_workstat, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
 
     let dbfile_oceanmgr = get_db_file("ocean.db", false);
-    let conn_oceanmgr_ro = Connection::open_with_flags(dbfile_oceanmgr, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let conn_oceanmgr_ro =
+        Connection::open_with_flags(dbfile_oceanmgr, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
 
     let dbfile = get_db_file("paycalc.db", false);
     let mut conn = Connection::open(&dbfile)?;
 
     // Start Payreq loop in background
-    thread::spawn(|| {
-        match payreq_loop_iterations() {
-            Err(e) => println!("Error: {e}"),
-            Ok(_) => {}
-        }
+    thread::spawn(|| match payreq_loop_iterations() {
+        Err(e) => println!("Error: {e}"),
+        Ok(_) => {}
     });
 
     // TODO

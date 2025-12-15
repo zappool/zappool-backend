@@ -14,7 +14,10 @@ pub fn get_data_dir() -> String {
     match env::var("DB_DIR") {
         Err(_) => {
             let local_dir = env::current_dir().unwrap();
-            println!("Using local directory as data dir, ({})", local_dir.to_str().unwrap_or_default());
+            println!(
+                "Using local directory as data dir, ({})",
+                local_dir.to_str().unwrap_or_default()
+            );
             local_dir.to_str().unwrap_or_default().to_string()
         }
         Ok(data_dir) => {
@@ -58,15 +61,13 @@ pub fn get_db_update_versions_from_args(default_to: u8) -> (u8, u8) {
     }
 
     println!("DB update versions: v{vfrom} --> v{vto}");
-    return (vto, vfrom)
+    return (vto, vfrom);
 }
 
 fn get_current_db_version(dbfile: &str) -> Result<u8, Box<dyn Error>> {
     let conn = Connection::open_with_flags(dbfile, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let mut stmt = conn.prepare("SELECT Version FROM VERSION LIMIT 1")?;
-    let version = stmt.query_one([], |row| {
-        row.get::<_, u8>(0)
-    })?;
+    let version = stmt.query_one([], |row| row.get::<_, u8>(0))?;
     Ok(version)
 }
 

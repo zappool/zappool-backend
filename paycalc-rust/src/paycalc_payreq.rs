@@ -19,10 +19,18 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// The portion of earning considered for payout of the the only-estimated-not-committed amount
 const PAYOUT_RATIO_FOR_ESTIMATED: f64 = 0.80;
 
-
 fn print_miner_snapshot(ss: &MinerSnapshot) {
-    println!("  {}:{} \t {} \t {} \t {} \t {} \t {} \t {}",
-        ss.user_id, shorten_id(&ss.user_s), ss.tot_commit, ss.tot_estimate, ss.tot_paid, ss.unpaid, ss.unpaid_cons, ss.payreq_id);
+    println!(
+        "  {}:{} \t {} \t {} \t {} \t {} \t {} \t {}",
+        ss.user_id,
+        shorten_id(&ss.user_s),
+        ss.tot_commit,
+        ss.tot_estimate,
+        ss.tot_paid,
+        ss.unpaid,
+        ss.unpaid_cons,
+        ss.payreq_id
+    );
 }
 
 pub fn print_miner_snapshots(conn: &Connection) -> Result<(), Box<dyn Error>> {
@@ -70,17 +78,33 @@ fn print_pay_requests(conn: &Connection) -> Result<(), Box<dyn Error>> {
     let open_pay_requests = db::payreq_get_all_non_final(conn)?;
     println!("Open pay requests: {}", open_pay_requests.len());
     for (pr, paym) in &open_pay_requests {
-        println!("  {} {} {} {} {} {} {} {} {}",
-            pr.id, pr.miner_id, pr.pri_id, pr.req_amnt, paym.req_id, paym.status, paym.retry_cnt, shorten_id(&paym.secon_id), shorten_id(&paym.terti_id));
+        println!(
+            "  {} {} {} {} {} {} {} {} {}",
+            pr.id,
+            pr.miner_id,
+            pr.pri_id,
+            pr.req_amnt,
+            paym.req_id,
+            paym.status,
+            paym.retry_cnt,
+            shorten_id(&paym.secon_id),
+            shorten_id(&paym.terti_id)
+        );
     }
     Ok(())
 }
 
 // Return PAYOUT_THRESHOLD_MSAT, PAYOUT_MAXIMUM_MSAT and PAYOUT_GRANULARITY_MSAT from env
 fn get_payout_threshold() -> Result<(u64, u64, u32), Box<dyn Error>> {
-    let mut threshold = env::var("PAYOUT_THRESHOLD_MSAT").unwrap_or("5000".into()).parse::<u64>()?;
-    let mut maximum = env::var("PAYOUT_MAXIMUM_MSAT").unwrap_or("20000000".into()).parse::<u64>()?;
-    let granularity = env::var("PAYOUT_GRANULARITY_MSAT").unwrap_or("1000".into()).parse::<u32>()?;
+    let mut threshold = env::var("PAYOUT_THRESHOLD_MSAT")
+        .unwrap_or("5000".into())
+        .parse::<u64>()?;
+    let mut maximum = env::var("PAYOUT_MAXIMUM_MSAT")
+        .unwrap_or("20000000".into())
+        .parse::<u64>()?;
+    let granularity = env::var("PAYOUT_GRANULARITY_MSAT")
+        .unwrap_or("1000".into())
+        .parse::<u32>()?;
     threshold = (((threshold as f64) / (granularity as f64)) * (granularity as f64)).ceil() as u64;
     maximum = (((maximum as f64) / (granularity as f64)) * (granularity as f64)).floor() as u64;
     // println!("{threshold} {maximum} {granularity}");
@@ -119,10 +143,16 @@ fn guess_payment_method(orig_payment_id: &str) -> Result<(&str, String), Box<dyn
         return Ok((PaymentMethod::PAYMENT_METHOD_LN_ADDRESS, payment_id));
     }
     // default: Nostr
-    Ok((PaymentMethod::PAYMENT_METHOD_NOSTR_LIGHTNING, orig_payment_id.to_string()))
+    Ok((
+        PaymentMethod::PAYMENT_METHOD_NOSTR_LIGHTNING,
+        orig_payment_id.to_string(),
+    ))
 }
 
-fn create_pay_request_if_needed(conn: &Transaction, miner: &mut MinerSnapshot) -> Result<(), Box<dyn Error>> {
+fn create_pay_request_if_needed(
+    conn: &Transaction,
+    miner: &mut MinerSnapshot,
+) -> Result<(), Box<dyn Error>> {
     let to_pay = calculate_to_pay_for_miner(miner)?;
     if to_pay.is_none() || to_pay.unwrap_or(0) == 0 {
         return Ok(());
@@ -146,14 +176,24 @@ fn create_pay_request_if_needed(conn: &Transaction, miner: &mut MinerSnapshot) -
     let (payment_method, primary_id) = guess_payment_method(&primary_id)?;
     //println(!"Payment method and adjusted primary ID:  {payment_method}  {primary_id}");
 
-    let pr = PayRequest::new(0, miner.user_id, to_pay, payment_method.to_string(), primary_id, miner.time);
+    let pr = PayRequest::new(
+        0,
+        miner.user_id,
+        to_pay,
+        payment_method.to_string(),
+        primary_id,
+        miner.time,
+    );
     let pr_id = db::payreq_insert_nocommit(conn, &pr)?;
     miner.payreq_id = pr_id as i32;
     Ok(())
 }
 
 // Compute updated committed/estimated/etc values for a miner snapshot
-fn compute_miner_snapshot_values(conn: &Connection, user_id: u32) -> Result<(u64, u64, u64, u64, u64), Box<dyn Error>> {
+fn compute_miner_snapshot_values(
+    conn: &Connection,
+    user_id: u32,
+) -> Result<(u64, u64, u64, u64, u64), Box<dyn Error>> {
     let tot_committed = db::work_get_user_total_committed(conn, user_id)?;
     let tot_estimated = db::work_get_user_total_estimated(conn, user_id)?;
     let tot_paid = db::payment_get_total_paid_to_miner(conn, user_id)?;
@@ -165,11 +205,23 @@ fn compute_miner_snapshot_values(conn: &Connection, user_id: u32) -> Result<(u64
 }
 
 // Update miner snapshot values (totals)
-fn update_miner_snapshot(conn: &Connection, ss: &mut MinerSnapshot) -> Result<bool, Box<dyn Error>> {
-    let now_utc = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as u32;
+fn update_miner_snapshot(
+    conn: &Connection,
+    ss: &mut MinerSnapshot,
+) -> Result<bool, Box<dyn Error>> {
+    let now_utc = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as u32;
 
-    let (tot_committed, tot_estimated, tot_paid, unpaid, unpaid_cons) = compute_miner_snapshot_values(conn, ss.user_id)?;
-    if tot_committed == ss.tot_commit && tot_estimated == ss.tot_estimate && tot_paid == ss.tot_paid && unpaid == ss.unpaid && unpaid_cons == ss.unpaid_cons {
+    let (tot_committed, tot_estimated, tot_paid, unpaid, unpaid_cons) =
+        compute_miner_snapshot_values(conn, ss.user_id)?;
+    if tot_committed == ss.tot_commit
+        && tot_estimated == ss.tot_estimate
+        && tot_paid == ss.tot_paid
+        && unpaid == ss.unpaid
+        && unpaid_cons == ss.unpaid_cons
+    {
         // No change
         return Ok(false);
     }
@@ -241,7 +293,10 @@ fn update_miner_snapshots_and_create_payreqs(conn: &mut Connection) -> Result<()
 
         if miner_ids_with_open_pay_request.contains_key(&id) {
             let pr = &miner_ids_with_open_pay_request[&id];
-            println!("WARNING: Miner {} already has a payrequest ({} {})", id, pr.id, pr.req_amnt);
+            println!(
+                "WARNING: Miner {} already has a payrequest ({} {})",
+                id, pr.id, pr.req_amnt
+            );
         } else {
             let _ = create_pay_request_if_needed(&conntx, ss)?;
         }
@@ -267,23 +322,39 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
     let dbfile = get_db_file("paycalc.db", false);
     let mut conn = Connection::open(&dbfile)?;
 
-    let payout_period_secs = env::var("PAYOUT_PERIOD_SECS").unwrap_or("86400".into()).parse::<u32>()?;
+    let payout_period_secs = env::var("PAYOUT_PERIOD_SECS")
+        .unwrap_or("86400".into())
+        .parse::<u32>()?;
     println!("Paycalc/Payreq: loop starting {payout_period_secs}");
 
     loop {
-        let now_utc = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as u32;
-        let next_new_time = ((now_utc as f64) / (payout_period_secs as f64)).round() as u32 * payout_period_secs + (payout_period_secs / 2);
+        let now_utc = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as u32;
+        let next_new_time = ((now_utc as f64) / (payout_period_secs as f64)).round() as u32
+            * payout_period_secs
+            + (payout_period_secs / 2);
         let diff = next_new_time - now_utc;
-        println!("Next payreq check time in {:.1} secs ({})", diff, next_new_time);
+        println!(
+            "Next payreq check time in {:.1} secs ({})",
+            diff, next_new_time
+        );
         loop {
-            let now_utc = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as u32;
+            let now_utc = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as u32;
             if now_utc >= next_new_time {
                 break;
             }
             let diff = next_new_time - now_utc;
             let to_wait = f64::max((0.90 * (diff as f64)).floor() + 0.05, 0.1);
             if to_wait >= 2.0 {
-                println!("Sleeping for {:.1} secs... (next_time {:.1} {})", to_wait, diff, next_new_time);
+                println!(
+                    "Sleeping for {:.1} secs... (next_time {:.1} {})",
+                    to_wait, diff, next_new_time
+                );
             }
             thread::sleep(Duration::from_secs_f64(to_wait));
         }

@@ -1,8 +1,8 @@
 use crate::dto_oc::BlockEarning;
 
 use rusqlite::{Connection, Row};
-use std::vec::Vec;
 use std::error::Error;
+use std::vec::Vec;
 
 fn blockearning_from_row(row: &Row) -> Result<BlockEarning, rusqlite::Error> {
     // println!("blockearning_from_row {0:?}", row);
@@ -16,15 +16,18 @@ fn blockearning_from_row(row: &Row) -> Result<BlockEarning, rusqlite::Error> {
     Ok(w)
 }
 
-pub fn get_new_blocks(conn: &Connection, old_time: u32) -> Result<Vec<BlockEarning>, Box<dyn Error>> {
-    let query_str =
-        "SELECT Time, BlockHash, Earning, PoolFee, TimeAddedFirst, TimeUpdated \
+pub fn get_new_blocks(
+    conn: &Connection,
+    old_time: u32,
+) -> Result<Vec<BlockEarning>, Box<dyn Error>> {
+    let query_str = "SELECT Time, BlockHash, Earning, PoolFee, TimeAddedFirst, TimeUpdated \
         FROM OC_BLOCK_EARN \
         WHERE Time > ?1 \
         ORDER BY Time ASC ";
 
     let mut stmt = conn.prepare(query_str)?;
-    let vector = stmt.query_map((old_time,), |row| blockearning_from_row(row))?
+    let vector = stmt
+        .query_map((old_time,), |row| blockearning_from_row(row))?
         .filter(|res| res.is_ok())
         .map(|res| res.unwrap())
         .collect::<Vec<BlockEarning>>();
@@ -32,15 +35,10 @@ pub fn get_new_blocks(conn: &Connection, old_time: u32) -> Result<Vec<BlockEarni
 }
 
 pub fn count_new_blocks(conn: &Connection, old_time: u32) -> Result<u32, Box<dyn Error>> {
-    let mut stmt = conn.prepare(
-        "SELECT COUNT(*) FROM OC_BLOCK_EARN WHERE Time > ?"
-    )?;
-    let res = stmt.query_one((old_time,), |row| {
-        Ok(row.get::<_, u32>(0).unwrap_or(0))
-    })?;
+    let mut stmt = conn.prepare("SELECT COUNT(*) FROM OC_BLOCK_EARN WHERE Time > ?")?;
+    let res = stmt.query_one((old_time,), |row| Ok(row.get::<_, u32>(0).unwrap_or(0)))?;
     Ok(res)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -82,23 +80,28 @@ mod tests {
         let connection = Connection::open_in_memory()?;
         create_test_db(&connection)?;
 
-        { // all
+        {
+            // all
             let count = get_new_blocks(&connection, 900)?;
             assert_eq!(count.iter().len(), 2);
         }
-        { // later ID
+        {
+            // later ID
             let count = get_new_blocks(&connection, 1050)?;
             assert_eq!(count.iter().len(), 1);
         }
-        { // ID just below a block
+        {
+            // ID just below a block
             let count = get_new_blocks(&connection, 1000)?;
             assert_eq!(count.iter().len(), 2);
         }
-        { // ID just at a block
+        {
+            // ID just at a block
             let count = get_new_blocks(&connection, 1001)?;
             assert_eq!(count.iter().len(), 1);
         }
-        { // ID just after a block
+        {
+            // ID just after a block
             let count = get_new_blocks(&connection, 1002)?;
             assert_eq!(count.iter().len(), 1);
         }
