@@ -226,6 +226,7 @@ impl PayRequest {
     }
 }
 
+#[derive(Clone)]
 pub struct Payment {
     pub id: i32,
     pub req_id: i32,

@@ -9,7 +9,7 @@ impl PaymentMethod {
 }
 
 pub struct PaymentResult {
-    pub succcess: bool,
+    pub success: bool,
     pub err_nonfinal: bool,
     pub err_code: u8,
     pub err_str: String,
@@ -22,26 +22,26 @@ pub struct PaymentResult {
 
 impl PaymentResult {
     pub fn new(
-        succcess: bool,
+        success: bool,
         err_nonfinal: bool,
         err_code: u8,
-        err_str: String,
-        secon_id: String,
-        terti_id: String,
+        err_str: &str,
+        secon_id: &str,
+        terti_id: &str,
         paid_amount: u64,
         paid_fee: u32,
-        reference: String,
+        reference: &str,
     ) -> Self {
         Self {
-            succcess,
+            success,
             err_nonfinal,
             err_code,
-            err_str,
-            secon_id,
-            terti_id,
+            err_str: err_str.to_string(),
+            secon_id: secon_id.to_string(),
+            terti_id: terti_id.to_string(),
             paid_amount,
             paid_fee,
-            reference,
+            reference: reference.to_string(),
         }
     }
 }

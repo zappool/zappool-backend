@@ -62,18 +62,16 @@ pub fn print_updated_miner_snapshots(conn: &Connection) -> Result<(), Box<dyn Er
     Ok(())
 }
 
-/*
-def print_pay_total_stats(conn: sqlite3.Connection):
-    print()
-    totals_res = db.payment_get_total_amount(conn)
-    if totals_res is not None:
-        total_paid, total_paid_fee = totals_res
-        total_paid = round(total_paid / 1000)
-        total_paid_fee = round(total_paid_fee / 1000)
-        print(f"Total paid:  {total_paid} (plus {total_paid_fee} fees)")
-*/
+pub fn print_pay_total_stats(conn: &Connection) -> Result<(), Box<dyn Error>> {
+    println!();
+    let (total_paid, total_paid_fee) = db::payment_get_total_amount(conn)?;
+    let total_paid = ((total_paid as f64) / 1000.0).round() as u64;
+    let total_paid_fee = ((total_paid_fee as f64) / 1000.0).round() as u32;
+    println!("Total paid:  {total_paid} (plus {total_paid_fee} fees)");
+    Ok(())
+}
 
-fn print_pay_requests(conn: &Connection) -> Result<(), Box<dyn Error>> {
+pub fn print_pay_requests(conn: &Connection) -> Result<(), Box<dyn Error>> {
     println!("");
     let open_pay_requests = db::payreq_get_all_non_final(conn)?;
     println!("Open pay requests: {}", open_pay_requests.len());

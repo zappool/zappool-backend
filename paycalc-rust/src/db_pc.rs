@@ -1023,36 +1023,54 @@ def payment_insert_nocommit(cursor: sqlite3.Cursor, p: Payment):
         if len(row) >= 1:
             return row[0]
     raise Exception(f"ERROR Could not insert payment {p.req_id}")
-
-
-# Return Id
-def payment_update_or_insert_nocommit(cursor: sqlite3.Cursor, p: Payment) -> int:
-    cursor.execute("""
-        UPDATE PAYMENT
-        SET ReqId = ?, CreateTime = ?, Status = ?, StatusTime = ?, ErrorCode = ?, ErrorStr = ?, RetryCnt = ?, FailTime = ?, SeconId = ?, TertiId = ?, PaidAmnt = ?, PaidFee = ?, PayTime = ?, PayRef = ?
-        WHERE Id = ?
-        """,
-        (p.req_id, p.create_time, p.status, p.status_time, p.error_code, p.error_str, p.retry_cnt, p.fail_time, p.secon_id, p.terti_id, p.paid_amnt, p.paid_fee, p.pay_time, p.pay_ref, p.id))
-
-    cursor.execute("SELECT Id FROM PAYMENT WHERE Id = ?", (p.id,))
-    rows = cursor.fetchall()
-    if len(rows) == 0:
-        # Not present
-        cursor.execute("""
-            INSERT INTO PAYMENT
-            (ReqId, CreateTime, Status, StatusTime, ErrorCode, ErrorStr, RetryCnt, FailTime, SeconId, TertiId, PaidAmnt, PaidFee, PayTime, PayRef)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING Id
-            """,
-            (p.req_id, p.create_time, p.status, p.status_time, p.error_code, p.error_str, p.retry_cnt, p.fail_time, p.secon_id, p.terti_id, p.paid_amnt, p.paid_fee, p.pay_time, p.pay_ref))
-        rows = cursor.fetchall()
-        if len(rows) >= 1:
-            if len(rows[0]) >= 1:
-                return rows[0][0]
-        raise Exception(f"Could not insert into payment, {p.id} {p.req_id}")
-    else:
-        return p.id
 */
+
+// Return Id
+pub fn payment_update_or_insert_nocommit(
+    conn: &Transaction,
+    p: &Payment,
+) -> Result<u32, Box<dyn Error>> {
+    let _ = conn.execute(
+        "UPDATE PAYMENT \
+        SET ReqId = ?1, CreateTime = ?2, Status = ?3, StatusTime = ?4, ErrorCode = ?5, ErrorStr = ?6, RetryCnt = ?7, FailTime = ?8, SeconId = ?9, TertiId = ?10, PaidAmnt = ?11, PaidFee = ?12, PayTime = ?13, PayRef = ?14 \
+        WHERE Id = ?15",
+        (p.req_id, p.create_time, p.status, p.status_time, p.error_code, &p.error_str, p.retry_cnt, p.fail_time, &p.secon_id, &p.terti_id, p.paid_amnt, p.paid_fee, p.pay_time, &p.pay_ref, p.id))?;
+
+    let mut stmt = conn.prepare("SELECT Id FROM PAYMENT WHERE Id = ?1")?;
+    if let Ok(id) = stmt.query_one((p.id,), |row| row.get::<_, u32>(0)) {
+        Ok(id)
+    } else {
+        // Not present
+        let mut stmt = conn.prepare(
+            "INSERT INTO PAYMENT \
+            (ReqId, CreateTime, Status, StatusTime, ErrorCode, ErrorStr, RetryCnt, FailTime, SeconId, TertiId, PaidAmnt, PaidFee, PayTime, PayRef) \
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14) \
+            RETURNING Id")?;
+        if let Ok(id) = stmt.query_one(
+            (
+                p.req_id,
+                p.create_time,
+                p.status,
+                p.status_time,
+                p.error_code,
+                &p.error_str,
+                p.retry_cnt,
+                p.fail_time,
+                &p.secon_id,
+                &p.terti_id,
+                p.paid_amnt,
+                p.paid_fee,
+                p.pay_time,
+                &p.pay_ref,
+            ),
+            |row| row.get::<_, u32>(0),
+        ) {
+            Ok(id)
+        } else {
+            Err(format!("Could not insert into payment, {} {}", p.id, p.req_id).into())
+        }
+    }
+}
 
 /// Get the total paid amount to a miner,
 /// successful ones and also including request-only, NotTried, InProgress and NonfinalFailure
@@ -1149,25 +1167,26 @@ def payment_get_all_after_time_user(conn: sqlite3.Connection, time: int, user_id
             res.append([paym, pr])
     cursor.close()
     return res
+*/
 
+// Get all-time payments sum. Only successful payments are included
+pub fn payment_get_total_amount(conn: &Connection) -> Result<(u64, u64), Box<dyn Error>> {
+    let mut stmt = conn.prepare(
+        "SELECT SUM(PAYMENT.PaidAmnt), SUM(PAYMENT.PaidFee) \
+        FROM PAYMENT \
+        WHERE PAYMENT.Status == 2")?;
+    let mut rows = stmt.query(())?;
+    if let Some(row) = rows.next()? {
+        Ok((
+            row.get::<_, u64>(0).unwrap_or(0),
+            row.get::<_, u64>(1).unwrap_or(0),
+        ))
+    } else {
+        Ok((0, 0))
+    }
+}
 
-# Get all-time payments sum. Only successful payments are included
-def payment_get_total_amount(conn: sqlite3.Connection) -> tuple[int, int] | None:
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT SUM(PAYMENT.PaidAmnt), SUM(PAYMENT.PaidFee)
-        FROM PAYMENT
-        WHERE PAYMENT.Status == 2
-    """)
-    rows = cursor.fetchall()
-    # print(rows)
-    if len(rows) >= 1:
-        r = rows[0]
-        if len(r) >= 2:
-            return (int(r[0]), int(r[1]))
-    return None
-
-
+/*
 # Get all-time payments sum for user. Only successful payments are included
 def payment_get_total_amount_for_user(conn: sqlite3.Connection, user_id: int) -> tuple[int, int] | None:
     cursor = conn.cursor()
@@ -1185,7 +1204,7 @@ def payment_get_total_amount_for_user(conn: sqlite3.Connection, user_id: int) ->
         if len(r) >= 2:
             return (int(r[0]), int(r[1]))
     return None
- */
+*/
 
 #[cfg(test)]
 mod tests {
