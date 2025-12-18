@@ -76,18 +76,19 @@ pub fn print_pay_requests(conn: &Connection) -> Result<(), Box<dyn Error>> {
     let open_pay_requests = db::payreq_get_all_non_final(conn)?;
     println!("Open pay requests: {}", open_pay_requests.len());
     for (pr, paym) in &open_pay_requests {
-        println!(
-            "  {} {} {} {} {} {} {} {} {}",
-            pr.id,
-            pr.miner_id,
-            pr.pri_id,
-            pr.req_amnt,
-            paym.req_id,
-            paym.status,
-            paym.retry_cnt,
-            shorten_id(&paym.secon_id),
-            shorten_id(&paym.terti_id)
-        );
+        print!("  {} {} {} {}", pr.id, pr.miner_id, pr.pri_id, pr.req_amnt,);
+        if let Some(paym) = paym {
+            println!(
+                "  {} {} {} {} {}",
+                paym.req_id,
+                paym.status,
+                paym.retry_cnt,
+                shorten_id(&paym.secon_id),
+                shorten_id(&paym.terti_id)
+            );
+        } else {
+            println!("-");
+        }
     }
     Ok(())
 }

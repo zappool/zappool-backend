@@ -893,7 +893,7 @@ pub fn miner_ss_get_all(conn: &Connection) -> Result<Vec<MinerSnapshot>, Box<dyn
     Ok(res)
 }
 
-fn _pays_from_raw(row: &Row) -> Result<(PayRequest, Payment), rusqlite::Error> {
+fn _payreq_from_raw_combined(row: &Row) -> Result<PayRequest, rusqlite::Error> {
     let pr = PayRequest::new(
         row.get::<_, i32>(0)?,
         row.get::<_, u32>(1)?,
@@ -902,6 +902,10 @@ fn _pays_from_raw(row: &Row) -> Result<(PayRequest, Payment), rusqlite::Error> {
         row.get::<_, String>(4)?,
         row.get::<_, u32>(5)?,
     );
+    Ok(pr)
+}
+
+fn _payment_from_raw_combined(row: &Row) -> Result<Payment, rusqlite::Error> {
     let paym = Payment::new(
         row.get::<_, i32>(6)?,
         row.get::<_, i32>(7)?,
@@ -919,6 +923,21 @@ fn _pays_from_raw(row: &Row) -> Result<(PayRequest, Payment), rusqlite::Error> {
         row.get::<_, u32>(19)?,
         row.get::<_, String>(20)?,
     );
+    Ok(paym)
+}
+
+fn _payreq_and_opt_pay_from_raw(
+    row: &Row,
+) -> Result<(PayRequest, Option<Payment>), rusqlite::Error> {
+    let pr = _payreq_from_raw_combined(row)?;
+    // payment may be missing
+    let paym = _payment_from_raw_combined(row).ok();
+    Ok((pr, paym))
+}
+
+fn _payreq_and_pay_from_raw(row: &Row) -> Result<(PayRequest, Payment), rusqlite::Error> {
+    let pr = _payreq_from_raw_combined(row)?;
+    let paym = _payment_from_raw_combined(row)?;
     Ok((pr, paym))
 }
 
@@ -990,7 +1009,7 @@ def payreq_get_id(conn: sqlite3.Connection, id: int) -> PayRequest:
 // with final state (2 SuccessFinal or 4 FailedFinal) exists.
 pub fn payreq_get_all_non_final(
     conn: &Connection,
-) -> Result<Vec<(PayRequest, Payment)>, Box<dyn Error>> {
+) -> Result<Vec<(PayRequest, Option<Payment>)>, Box<dyn Error>> {
     let mut stmt = conn.prepare(
         "SELECT \
         PAYREQ.Id, PAYREQ.MinerId, PAYREQ.ReqAmnt, PAYREQ.PayMethod, PAYREQ.PriId, PAYREQ.ReqTime, \
@@ -1000,10 +1019,10 @@ pub fn payreq_get_all_non_final(
         WHERE (PAYMENT.Status IS NULL OR (PAYMENT.Status != 2 AND PAYMENT.Status != 4)) \
         ORDER BY PAYREQ.ReqTime ASC")?;
     let res = stmt
-        .query_map((), |row| _pays_from_raw(row))?
+        .query_map((), |row| _payreq_and_opt_pay_from_raw(row))?
         .filter(|res| res.is_ok())
         .map(|res| res.unwrap())
-        .collect::<Vec<(PayRequest, Payment)>>();
+        .collect::<Vec<(PayRequest, Option<Payment>)>>();
     Ok(res)
 }
 
@@ -1137,7 +1156,7 @@ pub fn payment_get_all_after_time(
             WHERE PAYMENT.StatusTime > ?1 \
             ORDER BY PAYMENT.StatusTime ASC")?;
     let res = stmt
-        .query_map((time,), |row| _pays_from_raw(row))?
+        .query_map((time,), |row| _payreq_and_pay_from_raw(row))?
         .filter(|res| res.is_ok())
         .map(|res| res.unwrap())
         .collect::<Vec<(PayRequest, Payment)>>();
