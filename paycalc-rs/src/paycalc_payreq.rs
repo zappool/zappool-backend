@@ -79,7 +79,8 @@ pub fn print_pay_requests(conn: &Connection) -> Result<(), Box<dyn Error>> {
         print!("  {} {} {} {}", pr.id, pr.miner_id, pr.pri_id, pr.req_amnt,);
         if let Some(paym) = paym {
             println!(
-                "  {} {} {} {} {}",
+                "  {} {} {} {} {} {}",
+                paym.id,
                 paym.req_id,
                 paym.status,
                 paym.retry_cnt,
@@ -187,6 +188,7 @@ fn create_pay_request_if_needed(
     );
     let pr_id = db::payreq_insert_nocommit(conn, &pr)?;
     miner.payreq_id = pr_id as i32;
+    println!("Payment request created, ID {}, user {}", miner.payreq_id, miner.user_s);
     Ok(())
 }
 
