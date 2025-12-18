@@ -206,9 +206,13 @@ async fn process_payment_generic(
     ))
 }
 
-fn save_payment(conn: &mut Connection, paym: &Payment) -> Result<(), Box<dyn Error>> {
+fn save_payment(conn: &mut Connection, paym: &mut Payment) -> Result<(), Box<dyn Error>> {
     let mut conntx = conn.transaction()?;
-    let _ = db::payment_update_or_insert_nocommit(&mut conntx, &paym)?;
+    let id = db::payment_update_or_insert_nocommit(&mut conntx, &paym)? as i32;
+    if paym.id != id {
+        paym.id = id;
+        // println!("save_payment: updated id: {}", paym.id);
+    }
     let _ = conntx.commit()?;
     Ok(())
 }
@@ -227,7 +231,7 @@ async fn process_payment_start(
     let mut paym = match paym_orig {
         Some(p) => p.clone(),
         None => {
-            let paym = Payment::new(
+            let mut paym = Payment::new(
                 -1,
                 pr.id,
                 now_utc,
@@ -244,7 +248,7 @@ async fn process_payment_start(
                 0,
                 "".into(),
             );
-            let _ = save_payment(conn, &paym)?;
+            let _ = save_payment(conn, &mut paym)?;
             paym
         }
     };
@@ -290,7 +294,7 @@ async fn process_payment_start(
     paym.status = STATUS_IN_PROGRESS;
     paym.status_time = now_utc;
 
-    let _ = save_payment(conn, &paym)?;
+    let _ = save_payment(conn, &mut paym)?;
 
     let pay_res = process_payment_generic(&paym, pr).await?;
 
@@ -337,7 +341,7 @@ async fn process_payment_start(
     paym.error_code = pay_res.err_code;
     paym.error_str = pay_res.err_str;
 
-    let _ = save_payment(conn, &paym)?;
+    let _ = save_payment(conn, &mut paym)?;
 
     if paym.status != STATUS_SUCCESS_FINAL {
         println!(
