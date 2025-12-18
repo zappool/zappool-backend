@@ -614,7 +614,7 @@ fn iteration(
                 "ERROR: Total work committed and blocks committed mismatch {} vs. {} diff {}   {} {} {}",
                 tot_work_comm_post,
                 expected_new_comm_msat,
-                tot_work_comm_post - expected_new_comm_msat,
+                tot_work_comm_post as i64 - expected_new_comm_msat as i64,
                 tot_work_comm_pre,
                 tot_blocks_earned,
                 new_blocks_accntd
