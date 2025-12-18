@@ -1,0 +1,47 @@
+[package]
+name = "paycalc-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bech32 = "0.9"
+chrono = "0.4.42"
+cln-rpc = "0.5.0"
+dotenv = "0.15.0"
+futures-util = "0.3"
+hex-conservative = "0.3.0"
+reqwest = { version = "0.12.26", features = ["json"] }
+rusqlite = "0.37.0"
+serde = "1.0.228"
+serde_json = "1.0"
+tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }
+tokio-tungstenite = { version = "0.20", features = ["native-tls"] }
+uuid = { version = "1.0", features = ["v4"] }
+
+[[bin]]
+name = "main"
+path = "src/main/main.rs"
+
+[[bin]]
+name = "__setup_db"
+path = "src/__setup_db/main.rs"
+
+[[bin]]
+name = "main_dashboard"
+path = "src/main_dashboard/main.rs"
+
+[[bin]]
+name = "main_list_work"
+path = "src/main_list_work/main.rs"
+
+[main.dependencies]
+paycalc_rs = 0.1
+
+[__setub_db.dependencies]
+paycalc_rs = 0.1
+
+[main_dashboard.dependencies]
+paycalc_rs = 0.1
+
+[main_list_work.dependencies]
+paycalc_rs = 0.1
