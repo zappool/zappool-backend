@@ -33,15 +33,3 @@ path = "src/main_dashboard/main.rs"
 [[bin]]
 name = "main_list_work"
 path = "src/main_list_work/main.rs"
-
-[main.dependencies]
-paycalc_rs = 0.1
-
-[__setub_db.dependencies]
-paycalc_rs = 0.1
-
-[main_dashboard.dependencies]
-paycalc_rs = 0.1
-
-[main_list_work.dependencies]
-paycalc_rs = 0.1

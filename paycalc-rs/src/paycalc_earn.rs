@@ -458,7 +458,7 @@ fn update_given_work_estimates(
                 w.estimate,
                 w.commit_blocks,
                 w.committed,
-                now_utc - (w.time_add).round() as u32
+                now_utc as i32 - (w.time_add).round() as i32
             );
             let mut wcopy = w.clone();
             wcopy.estimate = new_estimate;

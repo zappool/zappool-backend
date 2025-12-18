@@ -206,10 +206,17 @@ async fn process_payment_generic(
     ))
 }
 
+fn save_payment(conn: &mut Connection, paym: &Payment) -> Result<(), Box<dyn Error>> {
+    let mut conntx = conn.transaction()?;
+    let _ = db::payment_update_or_insert_nocommit(&mut conntx, &paym)?;
+    let _ = conntx.commit()?;
+    Ok(())
+}
+
 async fn process_payment_start(
     conn: &mut Connection,
     pr: &PayRequest,
-    paym_orig: &Payment,
+    paym_orig: &Option<Payment>,
 ) -> Result<(), Box<dyn Error>> {
     let now_utc = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -217,46 +224,48 @@ async fn process_payment_start(
         .as_secs_f64()
         .floor() as u32;
 
-    if paym_orig.id < 0 {
-        let mut conntx = conn.transaction()?;
-        let mut paym = Payment::new(
-            -1,
-            pr.id,
-            now_utc,
-            STATUS_NOTTRIED,
-            now_utc,
-            0,
-            "".into(),
-            0,
-            0,
-            "".into(),
-            "".into(),
-            0,
-            0,
-            0,
-            "".into(),
-        );
-        paym.id = db::payment_update_or_insert_nocommit(&mut conntx, &paym)? as i32;
-        let _ = conntx.commit()?;
-    }
+    let mut paym = match paym_orig {
+        Some(p) => p.clone(),
+        None => {
+            let paym = Payment::new(
+                -1,
+                pr.id,
+                now_utc,
+                STATUS_NOTTRIED,
+                now_utc,
+                0,
+                "".into(),
+                0,
+                0,
+                "".into(),
+                "".into(),
+                0,
+                0,
+                0,
+                "".into(),
+            );
+            let _ = save_payment(conn, &paym)?;
+            paym
+        }
+    };
 
-    if paym_orig.status == STATUS_FINAL_FAILURE || paym_orig.status == STATUS_SUCCESS_FINAL {
+    if paym.status == STATUS_FINAL_FAILURE || paym.status == STATUS_SUCCESS_FINAL {
         println!(
             "WARNING: Payment is already final, ignoring ({})",
-            paym_orig.status
+            paym.status
         );
         return Ok(());
     }
 
-    if paym_orig.status == STATUS_NONFINAL_FAILURE {
-        let next_retry_time = paym_orig.fail_time + RETRY_DELAY;
+    if paym.status == STATUS_NONFINAL_FAILURE {
+        let next_retry_time = paym.fail_time + RETRY_DELAY;
         if now_utc < next_retry_time {
             // print(f"Payment was failed, retry cnt {paym.retry_cnt}, retrying later, in {next_retry_time - now_utc} secs")
             return Ok(());
         } else {
             println!(
                 "Payment was failed, retry cnt {} {}, retrying now",
-                paym_orig.retry_cnt, paym_orig.fail_time
+                paym.retry_cnt, paym.fail_time
             );
         }
     }
@@ -266,24 +275,22 @@ async fn process_payment_start(
         pr.id,
         pr.pri_id,
         pr.req_amnt,
-        paym_orig.req_id,
-        paym_orig.id,
-        paym_orig.status,
-        paym_orig.error_code,
-        paym_orig.error_str,
-        paym_orig.retry_cnt
+        paym.req_id,
+        paym.id,
+        paym.status,
+        paym.error_code,
+        paym.error_str,
+        paym.retry_cnt
     );
 
-    if paym_orig.status == STATUS_IN_PROGRESS {
+    if paym.status == STATUS_IN_PROGRESS {
         println!("WARNING: Payment marked as in progress, ignoring...");
     }
 
-    let mut paym = paym_orig.clone();
     paym.status = STATUS_IN_PROGRESS;
     paym.status_time = now_utc;
-    let mut conntx = conn.transaction()?;
-    let _ = db::payment_update_or_insert_nocommit(&mut conntx, &paym)?;
-    let _ = conntx.commit()?;
+
+    let _ = save_payment(conn, &paym)?;
 
     let pay_res = process_payment_generic(&paym, pr).await?;
 
@@ -329,9 +336,9 @@ async fn process_payment_start(
     }
     paym.error_code = pay_res.err_code;
     paym.error_str = pay_res.err_str;
-    let mut conntx = conn.transaction()?;
-    let _ = db::payment_update_or_insert_nocommit(&mut conntx, &paym)?;
-    let _ = conntx.commit()?;
+
+    let _ = save_payment(conn, &paym)?;
+
     if paym.status != STATUS_SUCCESS_FINAL {
         println!(
             "ERROR: There was an error in payment: {} {}  {} {} {} '{}'",
