@@ -882,8 +882,8 @@ pub fn miner_ss_get_all(conn: &Connection) -> Result<Vec<MinerSnapshot>, Box<dyn
                 row.get::<_, u64>(3)?,
                 row.get::<_, u64>(4)?,
                 row.get::<_, u64>(5)?,
-                row.get::<_, u64>(6)?,
-                row.get::<_, u64>(7)?,
+                row.get::<_, i64>(6)?,
+                row.get::<_, i64>(7)?,
                 row.get::<_, i32>(8)?,
             ))
         })?
@@ -1174,7 +1174,8 @@ pub fn payment_get_total_amount(conn: &Connection) -> Result<(u64, u64), Box<dyn
     let mut stmt = conn.prepare(
         "SELECT SUM(PAYMENT.PaidAmnt), SUM(PAYMENT.PaidFee) \
         FROM PAYMENT \
-        WHERE PAYMENT.Status == 2")?;
+        WHERE PAYMENT.Status == 2",
+    )?;
     let mut rows = stmt.query(())?;
     if let Some(row) = rows.next()? {
         Ok((

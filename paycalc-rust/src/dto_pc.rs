@@ -164,9 +164,9 @@ pub struct MinerSnapshot {
     pub tot_estimate: u64,
     pub tot_paid: u64,
     // Unpaid, diff bewteen estimate and paid; Msat
-    pub unpaid: u64,
+    pub unpaid: i64,
     // Diff between conservative estimate (committed + most estimate) and paid, may be negative; Msat
-    pub unpaid_cons: u64,
+    pub unpaid_cons: i64,
     pub payreq_id: i32,
 }
 
@@ -178,8 +178,8 @@ impl MinerSnapshot {
         tot_commit: u64,
         tot_estimate: u64,
         tot_paid: u64,
-        unpaid: u64,
-        unpaid_cons: u64,
+        unpaid: i64,
+        unpaid_cons: i64,
         payreq_id: i32,
     ) -> Self {
         Self {

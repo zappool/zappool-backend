@@ -115,9 +115,7 @@ pub async fn pay_invoice(
 #[allow(dead_code)]
 async fn get_info() -> Result<responses::GetinfoResponse, Box<dyn Error>> {
     let rpc_pipe_path = match get_rpc_path() {
-        Err(e) => {
-            return Err(format!("CLN not runnig or not accessible, {:?}", e).into())
-        }
+        Err(e) => return Err(format!("CLN not runnig or not accessible, {:?}", e).into()),
         Ok(p) => p,
     };
     let mut rpc = ClnRpc::new(rpc_pipe_path).await?;
@@ -132,16 +130,13 @@ async fn get_info() -> Result<responses::GetinfoResponse, Box<dyn Error>> {
 // Get funds info
 async fn get_funds_info() -> Result<responses::ListfundsResponse, Box<dyn Error>> {
     let rpc_pipe_path = match get_rpc_path() {
-        Err(e) => {
-            return Err(format!("CLN not runnig or not accessible, {:?}", e).into())
-        }
+        Err(e) => return Err(format!("CLN not runnig or not accessible, {:?}", e).into()),
         Ok(p) => p,
     };
     let mut rpc = ClnRpc::new(rpc_pipe_path).await?;
 
     let funds_req = requests::ListfundsRequest { spent: None };
     let funds_resp: responses::ListfundsResponse = rpc.call_typed(&funds_req).await?;
-    println!("info {:?}", funds_resp);
     Ok(funds_resp)
 }
 

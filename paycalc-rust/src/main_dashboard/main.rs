@@ -3,7 +3,9 @@ use paycalc_rust::common_db::get_db_file;
 use paycalc_rust::paycalc_earn::{
     Status, get_status_status, print_block_stats, print_blocks, print_status,
 };
-use paycalc_rust::paycalc_payreq::{print_miner_snapshots, print_pay_requests, print_pay_total_stats, print_updated_miner_snapshots};
+use paycalc_rust::paycalc_payreq::{
+    print_miner_snapshots, print_pay_requests, print_pay_total_stats, print_updated_miner_snapshots,
+};
 use paycalc_rust::payer::print_last_payments;
 
 use rusqlite::{Connection, OpenFlags};

@@ -111,12 +111,14 @@ fn get_payout_threshold() -> Result<(u64, u64, u32), Box<dyn Error>> {
 
 fn calculate_to_pay_for_miner(miner: &MinerSnapshot) -> Result<Option<u64>, Box<dyn Error>> {
     let (threshold, maximum, granularity) = get_payout_threshold()?;
-    if miner.unpaid_cons < threshold {
+    if miner.unpaid_cons < threshold as i64 {
         // too little, ignore for now
         return Ok(None);
     }
+    assert!(miner.unpaid_cons > 0);
+    let unpaid_cons = miner.unpaid_cons as u64; // it is non-negative by now
     // Clap to min, max
-    let mut to_pay = std::cmp::min(std::cmp::max(miner.unpaid_cons, threshold), maximum);
+    let mut to_pay = std::cmp::min(std::cmp::max(unpaid_cons, threshold), maximum);
     // Round to granularity (typically sat)
     to_pay = granularity as u64 * ((to_pay as f64) / (granularity as f64)).round() as u64;
     Ok(Some(to_pay))
@@ -188,17 +190,27 @@ fn create_pay_request_if_needed(
 }
 
 // Compute updated committed/estimated/etc values for a miner snapshot
+fn compute_unpaid_values(
+    tot_committed: u64,
+    tot_estimated: u64,
+    tot_paid: u64,
+) -> Result<(i64, i64), Box<dyn Error>> {
+    let unpaid = tot_committed as i64 + tot_estimated as i64 - tot_paid as i64;
+    let est_cons = ((tot_estimated as f64) * (PAYOUT_RATIO_FOR_ESTIMATED as f64)).floor() as i64;
+    let unpaid_cons = tot_committed as i64 + est_cons - tot_paid as i64;
+    Ok((unpaid, unpaid_cons))
+}
+
+// Compute updated committed/estimated/etc values for a miner snapshot
 fn compute_miner_snapshot_values(
     conn: &Connection,
     user_id: u32,
-) -> Result<(u64, u64, u64, u64, u64), Box<dyn Error>> {
+) -> Result<(u64, u64, u64, i64, i64), Box<dyn Error>> {
     let tot_committed = db::work_get_user_total_committed(conn, user_id)?;
     let tot_estimated = db::work_get_user_total_estimated(conn, user_id)?;
     let tot_paid = db::payment_get_total_paid_to_miner(conn, user_id)?;
     // println!("tot_paid {tot_paid} (id {id})");
-    let unpaid = tot_committed + tot_estimated - tot_paid;
-    let est_cons = ((tot_estimated as f64) * (PAYOUT_RATIO_FOR_ESTIMATED as f64)).floor() as u64;
-    let unpaid_cons = tot_committed + est_cons - tot_paid;
+    let (unpaid, unpaid_cons) = compute_unpaid_values(tot_committed, tot_estimated, tot_paid)?;
     Ok((tot_committed, tot_estimated, tot_paid, unpaid, unpaid_cons))
 }
 
@@ -364,6 +376,53 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_unpaid_values_basic_case() {
+        // Basic test case with typical values
+        let result = compute_unpaid_values(1000, 500, 200);
+        assert!(result.is_ok());
+
+        let (unpaid, unpaid_cons) = result.unwrap();
+        assert_eq!(unpaid, 1300);
+        assert_eq!(unpaid_cons, 1200);
+    }
+
+    #[test]
+    fn test_compute_unpaid_values_zero_values() {
+        // Test with all zero values
+        let result = compute_unpaid_values(0, 0, 0);
+        assert!(result.is_ok());
+
+        let (unpaid, unpaid_cons) = result.unwrap();
+        assert_eq!(unpaid, 0);
+        assert_eq!(unpaid_cons, 0);
+    }
+
+    #[test]
+    fn test_compute_unpaid_values_zero_committed() {
+        let result = compute_unpaid_values(0, 500, 300);
+        assert!(result.is_ok());
+
+        let (unpaid, unpaid_cons) = result.unwrap();
+        assert_eq!(unpaid, 200);
+        assert_eq!(unpaid_cons, 100);
+    }
+
+    #[test]
+    fn test_compute_unpaid_values_zero_committed_more_paid() {
+        let result = compute_unpaid_values(0, 500, 2000);
+        assert!(result.is_ok());
+
+        let (unpaid, unpaid_cons) = result.unwrap();
+        assert_eq!(unpaid, -1500);
+        assert_eq!(unpaid_cons, -1600);
+    }
 }
 
 // if __name__ == "__main__":

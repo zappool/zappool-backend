@@ -78,7 +78,7 @@ pub fn print_blocks(conn: &Connection) -> Result<(), Box<dyn Error>> {
     let start_time = now_utc - days * 86400;
     let blocks = db::block_get_new_blocks(conn, start_time)?;
     println!();
-    println!("Recent Blocks: {} in past {} days)", blocks.len(), days);
+    println!("Recent Blocks: ({} in past {} days)", blocks.len(), days);
     println!("  age (hr) \t earned \t tdiff \t poolfee \t unitearn(msat/128k)");
     for b in blocks {
         let age_hr = ((now_utc - b.time) as f64) / 3600.0;
