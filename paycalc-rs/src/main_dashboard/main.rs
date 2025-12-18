@@ -1,19 +1,19 @@
-use paycalc_rust::cln_pay::print_node_info;
-use paycalc_rust::common_db::get_db_file;
-use paycalc_rust::paycalc_earn::{
+use paycalc_rs::cln_pay::print_node_info;
+use paycalc_rs::common_db::get_db_file;
+use paycalc_rs::paycalc_earn::{
     Status, get_status_status, print_block_stats, print_blocks, print_status,
 };
-use paycalc_rust::paycalc_payreq::{
+use paycalc_rs::paycalc_payreq::{
     print_miner_snapshots, print_pay_requests, print_pay_total_stats, print_updated_miner_snapshots,
 };
-use paycalc_rust::payer::print_last_payments;
+use paycalc_rs::payer::print_last_payments;
 
 use rusqlite::{Connection, OpenFlags};
 use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // paycalc_rust::ln_address::do_try().await;
+    // paycalc_rs::ln_address::do_try().await;
 
     let dbfile = get_db_file("paycalc.db", false);
     let conn = Connection::open_with_flags(dbfile, OpenFlags::SQLITE_OPEN_READ_ONLY)?;

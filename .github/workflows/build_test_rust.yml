@@ -19,7 +19,7 @@ jobs:
       run: sudo apt-get install cargo && rustup override set 1.85
     - uses: actions/checkout@v4
     - name: Build Rust
-      run: cd paycalc-rust && cargo build
+      run: cd paycalc-rs && cargo build
     - name: Run unit tests
-      run: cd paycalc-rust && cargo test
+      run: cd paycalc-rs && cargo test
 

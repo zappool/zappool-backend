@@ -10,7 +10,7 @@ Requires=lightningd.service
 
 [Service]
 WorkingDirectory=/home/ubuntu/zappool
-ExecStart=/home/ubuntu/zappool/paycalc-rust/target/debug/main
+ExecStart=/home/ubuntu/zappool/paycalc-rs/target/debug/main
 
 # Make sure the config directory is readable by the service user
 #PermissionsStartOnly=true

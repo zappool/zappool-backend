@@ -1,7 +1,7 @@
-use paycalc_rust::common_db::get_db_file;
-use paycalc_rust::paycalc_earn::loop_iterations;
-use paycalc_rust::paycalc_payreq::loop_iterations as payreq_loop_iterations;
-use paycalc_rust::payer::loop_iterations as payer_loop_iterations;
+use paycalc_rs::common_db::get_db_file;
+use paycalc_rs::paycalc_earn::loop_iterations;
+use paycalc_rs::paycalc_payreq::loop_iterations as payreq_loop_iterations;
+use paycalc_rs::payer::loop_iterations as payer_loop_iterations;
 
 use dotenv;
 use rusqlite::{Connection, OpenFlags};

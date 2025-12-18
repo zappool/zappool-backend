@@ -1,5 +1,5 @@
 [package]
-name = "paycalc-rust"
+name = "paycalc-rs"
 version = "0.1.0"
 edition = "2024"
 
@@ -35,13 +35,13 @@ name = "main_list_work"
 path = "src/main_list_work/main.rs"
 
 [main.dependencies]
-paycalc_rust = 0.1
+paycalc_rs = 0.1
 
 [__setub_db.dependencies]
-paycalc_rust = 0.1
+paycalc_rs = 0.1
 
 [main_dashboard.dependencies]
-paycalc_rust = 0.1
+paycalc_rs = 0.1
 
 [main_list_work.dependencies]
-paycalc_rust = 0.1
+paycalc_rs = 0.1

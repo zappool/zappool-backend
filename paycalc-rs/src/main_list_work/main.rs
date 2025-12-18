@@ -1,6 +1,6 @@
-use paycalc_rust::common_db::get_db_file;
-use paycalc_rust::db_pc::get_status;
-use paycalc_rust::db_ws::{get_work_after_id, get_work_count};
+use paycalc_rs::common_db::get_db_file;
+use paycalc_rs::db_pc::get_status;
+use paycalc_rs::db_ws::{get_work_after_id, get_work_count};
 
 use rusqlite::{Connection, OpenFlags};
 use std::error::Error;

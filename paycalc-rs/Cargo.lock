@@ -909,7 +909,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "paycalc-rust"
+name = "paycalc-rs"
 version = "0.1.0"
 dependencies = [
  "bech32 0.9.1",
