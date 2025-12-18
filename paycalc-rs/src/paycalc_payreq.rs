@@ -87,7 +87,7 @@ pub fn print_pay_requests(conn: &Connection) -> Result<(), Box<dyn Error>> {
                 shorten_id(&paym.terti_id)
             );
         } else {
-            println!("-");
+            println!("  --");
         }
     }
     Ok(())

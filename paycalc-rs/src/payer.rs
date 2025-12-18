@@ -206,6 +206,13 @@ async fn process_payment_generic(
     ))
 }
 
+fn save_payment(conn: &mut Connection, paym: &Payment) -> Result<(), Box<dyn Error>> {
+    let mut conntx = conn.transaction()?;
+    let _ = db::payment_update_or_insert_nocommit(&mut conntx, &paym)?;
+    let _ = conntx.commit()?;
+    Ok(())
+}
+
 async fn process_payment_start(
     conn: &mut Connection,
     pr: &PayRequest,
@@ -217,11 +224,10 @@ async fn process_payment_start(
         .as_secs_f64()
         .floor() as u32;
 
-    let paym = match paym_orig {
+    let mut paym = match paym_orig {
         Some(p) => p.clone(),
         None => {
-            let mut conntx = conn.transaction()?;
-            let mut paym = Payment::new(
+            let paym = Payment::new(
                 -1,
                 pr.id,
                 now_utc,
@@ -238,8 +244,7 @@ async fn process_payment_start(
                 0,
                 "".into(),
             );
-            paym.id = db::payment_update_or_insert_nocommit(&mut conntx, &paym)? as i32;
-            let _ = conntx.commit()?;
+            let _ = save_payment(conn, &paym)?;
             paym
         }
     };
@@ -282,12 +287,10 @@ async fn process_payment_start(
         println!("WARNING: Payment marked as in progress, ignoring...");
     }
 
-    let mut paym = paym.clone();
     paym.status = STATUS_IN_PROGRESS;
     paym.status_time = now_utc;
-    let mut conntx = conn.transaction()?;
-    let _ = db::payment_update_or_insert_nocommit(&mut conntx, &paym)?;
-    let _ = conntx.commit()?;
+
+    let _ = save_payment(conn, &paym)?;
 
     let pay_res = process_payment_generic(&paym, pr).await?;
 
@@ -334,9 +337,7 @@ async fn process_payment_start(
     paym.error_code = pay_res.err_code;
     paym.error_str = pay_res.err_str;
 
-    let mut conntx = conn.transaction()?;
-    let _ = db::payment_update_or_insert_nocommit(&mut conntx, &paym)?;
-    let _ = conntx.commit()?;
+    let _ = save_payment(conn, &paym)?;
 
     if paym.status != STATUS_SUCCESS_FINAL {
         println!(
