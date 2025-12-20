@@ -1,8 +1,8 @@
-use crate::common::{PaymentMethod, shorten_id};
+use crate::common::shorten_id;
 use crate::common_db::get_db_file;
 use crate::db_pc as db;
 use crate::dto_pc::{MinerSnapshot, PayRequest};
-use crate::nostr_user::get_user_method_setting_override;
+use crate::payment_method::determine_payment_method;
 
 use dotenv;
 use rusqlite::{Connection, Transaction};
@@ -125,48 +125,6 @@ fn calculate_to_pay_for_miner(miner: &MinerSnapshot) -> Result<Option<u64>, Box<
     // Round to granularity (typically sat)
     to_pay = granularity as u64 * ((to_pay as f64) / (granularity as f64)).round() as u64;
     Ok(Some(to_pay))
-}
-
-/// Sanitize primary ID, such as:
-/// - Replace "_" characters with "." (dot cannot appear in miner username, as it's the worker separator)
-fn sanitize_primary_id(id: String) -> String {
-    id.replace("_", ".")
-}
-
-/// Guess the payment method, adjust the primary ID
-/// Return: payment method and adjusted primary ID
-fn guess_payment_method(orig_payment_id: &str) -> Result<(PaymentMethod, String), Box<dyn Error>> {
-    if orig_payment_id.starts_with("LA:") {
-        let payment_id = sanitize_primary_id(orig_payment_id[3..].to_string());
-        return Ok((PaymentMethod::PmLnAddress, payment_id));
-    }
-    // If it has '@', assume it is LA
-    if orig_payment_id.contains("@") {
-        let payment_id = sanitize_primary_id(orig_payment_id.to_string());
-        return Ok((PaymentMethod::PmLnAddress, payment_id));
-    }
-    // default: Nostr
-    Ok((PaymentMethod::PmNostrLightning, orig_payment_id.to_string()))
-}
-
-fn determine_payment_method(
-    userid: u32,
-    orig_payment_id: &str,
-) -> Result<(PaymentMethod, String), Box<dyn Error>> {
-    if let Some(override_pm) = get_user_method_setting_override(userid) {
-        println!(
-            "Using payment method override {:?} for user {}",
-            override_pm, userid
-        );
-        return Ok((override_pm, orig_payment_id.to_owned()));
-    }
-    // TODO if guessed is Nostr, check user setting from Nostr
-    let (guessed_pm, guessed_pid) = guess_payment_method(orig_payment_id)?;
-    println!(
-        "Using guessed payment method {:?} for user {}, adjusted primary ID {}",
-        guessed_pm, userid, guessed_pid,
-    );
-    Ok((guessed_pm, guessed_pid))
 }
 
 fn create_pay_request_if_needed(
@@ -446,29 +404,4 @@ mod tests {
         assert_eq!(unpaid, -1500);
         assert_eq!(unpaid_cons, -1600);
     }
-
-    #[test]
-    fn test_guess_payment_method() {
-        {
-            let s = "npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg";
-            let r = guess_payment_method(s).unwrap();
-            assert_eq!(r.0, PaymentMethod::PmNostrLightning);
-            assert_eq!(r.1, s);
-        }
-        {
-            let r = guess_payment_method("zappool@blink_sv").unwrap();
-            assert_eq!(r.0, PaymentMethod::PmLnAddress);
-            assert_eq!(r.1, "zappool@blink.sv");
-        }
-        {
-            let r = guess_payment_method("LA:zappool@blink_sv").unwrap();
-            assert_eq!(r.0, PaymentMethod::PmLnAddress);
-            assert_eq!(r.1, "zappool@blink.sv");
-        }
-    }
 }
-
-// if __name__ == "__main__":
-//     print(guess_payment_method("npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg"))
-//     print(guess_payment_method("zappool@blink_sv"))
-//     print(guess_payment_method("LA:zappool@blink_sv"))
