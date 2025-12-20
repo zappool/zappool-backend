@@ -187,10 +187,10 @@ async fn process_payment_generic(
     paym: &Payment,
     pr: &PayRequest,
 ) -> Result<PaymentResult, Box<dyn Error>> {
-    if pr.pay_method == PaymentMethod::PAYMENT_METHOD_LN_ADDRESS {
+    if pr.pay_method == PaymentMethod::PmLnAddress.to_string() {
         return process_lightning_address_payment(paym, pr).await;
     }
-    if pr.pay_method == PaymentMethod::PAYMENT_METHOD_NOSTR_LIGHTNING {
+    if pr.pay_method == PaymentMethod::PmNostrLightning.to_string() {
         return process_nostr_lightning_payment(paym, pr).await;
     }
     Ok(PaymentResult::new(

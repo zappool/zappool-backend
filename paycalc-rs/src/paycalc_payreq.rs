@@ -134,21 +134,18 @@ fn sanitize_primary_id(id: String) -> String {
 
 /// Guess the payment method, adjust the primary ID
 /// Return: payment method and adjusted primary ID
-fn guess_payment_method(orig_payment_id: &str) -> Result<(&str, String), Box<dyn Error>> {
+fn guess_payment_method(orig_payment_id: &str) -> Result<(PaymentMethod, String), Box<dyn Error>> {
     if orig_payment_id.starts_with("LA:") {
         let payment_id = sanitize_primary_id(orig_payment_id[3..].to_string());
-        return Ok((PaymentMethod::PAYMENT_METHOD_LN_ADDRESS, payment_id));
+        return Ok((PaymentMethod::PmLnAddress, payment_id));
     }
     // If it has '@', assume it is LA
     if orig_payment_id.contains("@") {
         let payment_id = sanitize_primary_id(orig_payment_id.to_string());
-        return Ok((PaymentMethod::PAYMENT_METHOD_LN_ADDRESS, payment_id));
+        return Ok((PaymentMethod::PmLnAddress, payment_id));
     }
     // default: Nostr
-    Ok((
-        PaymentMethod::PAYMENT_METHOD_NOSTR_LIGHTNING,
-        orig_payment_id.to_string(),
-    ))
+    Ok((PaymentMethod::PmNostrLightning, orig_payment_id.to_string()))
 }
 
 fn create_pay_request_if_needed(
@@ -188,7 +185,10 @@ fn create_pay_request_if_needed(
     );
     let pr_id = db::payreq_insert_nocommit(conn, &pr)?;
     miner.payreq_id = pr_id as i32;
-    println!("Payment request created, ID {}, user {}", miner.payreq_id, miner.user_s);
+    println!(
+        "Payment request created, ID {}, user {}",
+        miner.payreq_id, miner.user_s
+    );
     Ok(())
 }
 
@@ -425,6 +425,26 @@ mod tests {
         let (unpaid, unpaid_cons) = result.unwrap();
         assert_eq!(unpaid, -1500);
         assert_eq!(unpaid_cons, -1600);
+    }
+
+    #[test]
+    fn test_guess_payment_method() {
+        {
+            let s = "npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg";
+            let r = guess_payment_method(s).unwrap();
+            assert_eq!(r.0, PaymentMethod::PmNostrLightning);
+            assert_eq!(r.1, s);
+        }
+        {
+            let r = guess_payment_method("zappool@blink_sv").unwrap();
+            assert_eq!(r.0, PaymentMethod::PmLnAddress);
+            assert_eq!(r.1, "zappool@blink.sv");
+        }
+        {
+            let r = guess_payment_method("LA:zappool@blink_sv").unwrap();
+            assert_eq!(r.0, PaymentMethod::PmLnAddress);
+            assert_eq!(r.1, "zappool@blink.sv");
+        }
     }
 }
 

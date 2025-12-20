@@ -1,11 +1,20 @@
-/// Payment methods:
-pub struct PaymentMethod {}
-
-impl PaymentMethod {
+/// Payment methods
+#[derive(Debug, PartialEq)]
+pub enum PaymentMethod {
     /// Lightning Address: Lightning Address -> Lightning payment
-    pub const PAYMENT_METHOD_LN_ADDRESS: &str = "LNAD";
+    PmLnAddress,
     /// Nostr Lightning: NPub -> Nostr Profile -> Lightning Address -> Lightning payment
-    pub const PAYMENT_METHOD_NOSTR_LIGHTNING: &str = "NOLN";
+    PmNostrLightning,
+}
+
+impl ToString for PaymentMethod {
+    fn to_string(&self) -> String {
+        match self {
+            Self::PmLnAddress => "LNAD",
+            Self::PmNostrLightning => "NOLN",
+        }
+        .to_string()
+    }
 }
 
 pub struct PaymentResult {
