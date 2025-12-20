@@ -10,6 +10,7 @@ mod dto_ws;
 mod error_codes;
 pub mod ln_address;
 mod nostr_profile;
+mod nostr_user;
 pub mod paycalc_earn;
 pub mod paycalc_payreq;
 pub mod payer;

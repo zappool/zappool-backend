@@ -1,3 +1,6 @@
+use std::error::Error;
+use std::str::FromStr;
+
 /// Payment methods
 #[derive(Debug, PartialEq)]
 pub enum PaymentMethod {
@@ -14,6 +17,17 @@ impl ToString for PaymentMethod {
             Self::PmNostrLightning => "NOLN",
         }
         .to_string()
+    }
+}
+
+impl FromStr for PaymentMethod {
+    type Err = Box<dyn Error>;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "LNAD" => Ok(PaymentMethod::PmLnAddress),
+            "NOLN" => Ok(PaymentMethod::PmNostrLightning),
+            _ => Err(format!("Unknown payment method {s}").into()),
+        }
     }
 }
 
