@@ -193,6 +193,10 @@ async fn process_payment_generic(
     if pr.pay_method == PaymentMethod::PmNostrLightning.to_string() {
         return process_nostr_lightning_payment(paym, pr).await;
     }
+    if pr.pay_method == PaymentMethod::PmNostrZap.to_string() {
+        // TODO use specialized zap method
+        return process_nostr_lightning_payment(paym, pr).await;
+    }
     Ok(PaymentResult::new(
         false,
         false,

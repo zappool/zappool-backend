@@ -96,14 +96,18 @@ mod test {
 
     #[test]
     fn test_get_user_setting_override_from_envstr() {
-        let s = "12:LNAD,4:NOLN,72:NO_SUCH_PM";
+        let s = "61:LNAD,62:NOLN,63:ZAP,72:NO_SUCH_PM";
         assert_eq!(
-            get_user_method_setting_override_from_envstr(12, s),
+            get_user_method_setting_override_from_envstr(61, s),
             Some(PaymentMethod::PmLnAddress)
         );
         assert_eq!(
-            get_user_method_setting_override_from_envstr(4, s),
+            get_user_method_setting_override_from_envstr(62, s),
             Some(PaymentMethod::PmNostrLightning)
+        );
+        assert_eq!(
+            get_user_method_setting_override_from_envstr(63, s),
+            Some(PaymentMethod::PmNostrZap)
         );
         // Not present:
         assert_eq!(get_user_method_setting_override_from_envstr(666, s), None);
