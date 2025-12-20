@@ -1,11 +1,34 @@
-/// Payment methods:
-pub struct PaymentMethod {}
+use std::error::Error;
+use std::str::FromStr;
 
-impl PaymentMethod {
+/// Payment methods
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PaymentMethod {
     /// Lightning Address: Lightning Address -> Lightning payment
-    pub const PAYMENT_METHOD_LN_ADDRESS: &str = "LNAD";
+    PmLnAddress,
     /// Nostr Lightning: NPub -> Nostr Profile -> Lightning Address -> Lightning payment
-    pub const PAYMENT_METHOD_NOSTR_LIGHTNING: &str = "NOLN";
+    PmNostrLightning,
+}
+
+impl ToString for PaymentMethod {
+    fn to_string(&self) -> String {
+        match self {
+            Self::PmLnAddress => "LNAD",
+            Self::PmNostrLightning => "NOLN",
+        }
+        .to_string()
+    }
+}
+
+impl FromStr for PaymentMethod {
+    type Err = Box<dyn Error>;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "LNAD" => Ok(PaymentMethod::PmLnAddress),
+            "NOLN" => Ok(PaymentMethod::PmNostrLightning),
+            _ => Err(format!("Unknown payment method {s}").into()),
+        }
+    }
 }
 
 pub struct PaymentResult {

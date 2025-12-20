@@ -13,3 +13,4 @@ mod nostr_profile;
 pub mod paycalc_earn;
 pub mod paycalc_payreq;
 pub mod payer;
+mod payment_method;

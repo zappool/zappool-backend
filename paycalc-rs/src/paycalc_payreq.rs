@@ -1,7 +1,8 @@
-use crate::common::{PaymentMethod, shorten_id};
+use crate::common::shorten_id;
 use crate::common_db::get_db_file;
 use crate::db_pc as db;
 use crate::dto_pc::{MinerSnapshot, PayRequest};
+use crate::payment_method::{adjusted_primary_id, determine_payment_method};
 
 use dotenv;
 use rusqlite::{Connection, Transaction};
@@ -126,31 +127,6 @@ fn calculate_to_pay_for_miner(miner: &MinerSnapshot) -> Result<Option<u64>, Box<
     Ok(Some(to_pay))
 }
 
-/// Sanitize primary ID, such as:
-/// - Replace "_" characters with "." (dot cannot appear in miner username, as it's the worker separator)
-fn sanitize_primary_id(id: String) -> String {
-    id.replace("_", ".")
-}
-
-/// Guess the payment method, adjust the primary ID
-/// Return: payment method and adjusted primary ID
-fn guess_payment_method(orig_payment_id: &str) -> Result<(&str, String), Box<dyn Error>> {
-    if orig_payment_id.starts_with("LA:") {
-        let payment_id = sanitize_primary_id(orig_payment_id[3..].to_string());
-        return Ok((PaymentMethod::PAYMENT_METHOD_LN_ADDRESS, payment_id));
-    }
-    // If it has '@', assume it is LA
-    if orig_payment_id.contains("@") {
-        let payment_id = sanitize_primary_id(orig_payment_id.to_string());
-        return Ok((PaymentMethod::PAYMENT_METHOD_LN_ADDRESS, payment_id));
-    }
-    // default: Nostr
-    Ok((
-        PaymentMethod::PAYMENT_METHOD_NOSTR_LIGHTNING,
-        orig_payment_id.to_string(),
-    ))
-}
-
 fn create_pay_request_if_needed(
     conn: &Transaction,
     miner: &mut MinerSnapshot,
@@ -175,20 +151,26 @@ fn create_pay_request_if_needed(
     }
     //println!(primary_id);
 
-    let (payment_method, primary_id) = guess_payment_method(&primary_id)?;
-    //println(!"Payment method and adjusted primary ID:  {payment_method}  {primary_id}");
+    let payment_method = determine_payment_method(miner.user_id, &primary_id)?;
+    let adj_primary_id = adjusted_primary_id(payment_method, &primary_id)?;
+    if adj_primary_id != primary_id {
+        println!("Adjusted primary id: {}  ({})", adj_primary_id, primary_id);
+    }
 
     let pr = PayRequest::new(
         0,
         miner.user_id,
         to_pay,
         payment_method.to_string(),
-        primary_id,
+        adj_primary_id,
         miner.time,
     );
     let pr_id = db::payreq_insert_nocommit(conn, &pr)?;
     miner.payreq_id = pr_id as i32;
-    println!("Payment request created, ID {}, user {}", miner.payreq_id, miner.user_s);
+    println!(
+        "Payment request created, ID {}, user {}",
+        miner.payreq_id, miner.user_s
+    );
     Ok(())
 }
 
@@ -427,8 +409,3 @@ mod tests {
         assert_eq!(unpaid_cons, -1600);
     }
 }
-
-// if __name__ == "__main__":
-//     print(guess_payment_method("npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg"))
-//     print(guess_payment_method("zappool@blink_sv"))
-//     print(guess_payment_method("LA:zappool@blink_sv"))
