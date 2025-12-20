@@ -8,6 +8,8 @@ pub enum PaymentMethod {
     PmLnAddress,
     /// Nostr Lightning: NPub -> Nostr Profile -> Lightning Address -> Lightning payment
     PmNostrLightning,
+    /// Nostr Zap: NPub -> Nostr Profile -> Lightning Address -> Lightning payment with Zap
+    PmNostrZap,
 }
 
 impl ToString for PaymentMethod {
@@ -15,6 +17,7 @@ impl ToString for PaymentMethod {
         match self {
             Self::PmLnAddress => "LNAD",
             Self::PmNostrLightning => "NOLN",
+            Self::PmNostrZap => "ZAP",
         }
         .to_string()
     }
@@ -26,6 +29,7 @@ impl FromStr for PaymentMethod {
         match s {
             "LNAD" => Ok(PaymentMethod::PmLnAddress),
             "NOLN" => Ok(PaymentMethod::PmNostrLightning),
+            "ZAP" => Ok(PaymentMethod::PmNostrZap),
             _ => Err(format!("Unknown payment method {s}").into()),
         }
     }
