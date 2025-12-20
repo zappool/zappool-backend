@@ -2,6 +2,7 @@ use crate::common::{PaymentMethod, shorten_id};
 use crate::common_db::get_db_file;
 use crate::db_pc as db;
 use crate::dto_pc::{MinerSnapshot, PayRequest};
+use crate::nostr_user::get_user_method_setting_override;
 
 use dotenv;
 use rusqlite::{Connection, Transaction};
@@ -148,6 +149,26 @@ fn guess_payment_method(orig_payment_id: &str) -> Result<(PaymentMethod, String)
     Ok((PaymentMethod::PmNostrLightning, orig_payment_id.to_string()))
 }
 
+fn determine_payment_method(
+    userid: u32,
+    orig_payment_id: &str,
+) -> Result<(PaymentMethod, String), Box<dyn Error>> {
+    if let Some(override_pm) = get_user_method_setting_override(userid) {
+        println!(
+            "Using payment method override {:?} for user {}",
+            override_pm, userid
+        );
+        return Ok((override_pm, orig_payment_id.to_owned()));
+    }
+    // TODO if guessed is Nostr, check user setting from Nostr
+    let (guessed_pm, guessed_pid) = guess_payment_method(orig_payment_id)?;
+    println!(
+        "Using guessed payment method {:?} for user {}, adjusted primary ID {}",
+        guessed_pm, userid, guessed_pid,
+    );
+    Ok((guessed_pm, guessed_pid))
+}
+
 fn create_pay_request_if_needed(
     conn: &Transaction,
     miner: &mut MinerSnapshot,
@@ -172,8 +193,7 @@ fn create_pay_request_if_needed(
     }
     //println!(primary_id);
 
-    let (payment_method, primary_id) = guess_payment_method(&primary_id)?;
-    //println(!"Payment method and adjusted primary ID:  {payment_method}  {primary_id}");
+    let (payment_method, primary_id) = determine_payment_method(miner.user_id, &primary_id)?;
 
     let pr = PayRequest::new(
         0,

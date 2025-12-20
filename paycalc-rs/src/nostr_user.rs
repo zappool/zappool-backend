@@ -26,10 +26,7 @@ pub fn get_user_method_setting_override(userid: u32) -> Option<PaymentMethod> {
         None => None,
         Some(s) => match get_user_method_setting_override_from_envstr(userid, &s) {
             None => None,
-            Some(p) => {
-                println!("Using payment method override {:?} for user {}", p, userid);
-                Some(p)
-            }
+            Some(p) => Some(p),
         },
     }
 }
