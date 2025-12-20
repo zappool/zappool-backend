@@ -2,7 +2,7 @@ use std::error::Error;
 use std::str::FromStr;
 
 /// Payment methods
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PaymentMethod {
     /// Lightning Address: Lightning Address -> Lightning payment
     PmLnAddress,

@@ -2,7 +2,7 @@ use crate::common::shorten_id;
 use crate::common_db::get_db_file;
 use crate::db_pc as db;
 use crate::dto_pc::{MinerSnapshot, PayRequest};
-use crate::payment_method::determine_payment_method;
+use crate::payment_method::{adjusted_primary_id, determine_payment_method};
 
 use dotenv;
 use rusqlite::{Connection, Transaction};
@@ -151,14 +151,18 @@ fn create_pay_request_if_needed(
     }
     //println!(primary_id);
 
-    let (payment_method, primary_id) = determine_payment_method(miner.user_id, &primary_id)?;
+    let payment_method = determine_payment_method(miner.user_id, &primary_id)?;
+    let adj_primary_id = adjusted_primary_id(payment_method, &primary_id)?;
+    if adj_primary_id != primary_id {
+        println!("Adjusted primary id: {}  ({})", adj_primary_id, primary_id);
+    }
 
     let pr = PayRequest::new(
         0,
         miner.user_id,
         to_pay,
         payment_method.to_string(),
-        primary_id,
+        adj_primary_id,
         miner.time,
     );
     let pr_id = db::payreq_insert_nocommit(conn, &pr)?;
