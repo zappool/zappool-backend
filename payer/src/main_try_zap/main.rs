@@ -1,13 +1,20 @@
 use payer::nostr_zap::nostr_zap;
 
+use dotenv;
 use nostr::SecretKey;
 use seedstore::KeyStore;
+
+use std::env;
 
 const DEFAULT_SECRET_FILE: &str = "secret.nsec";
 
 #[tokio::main]
 async fn main() {
-    let keystore = KeyStore::new_from_encrypted_file(DEFAULT_SECRET_FILE, "zappool").unwrap();
+    // Load environment variables from .env file
+    dotenv::dotenv().ok();
+    let nsec_password = env::var("NOSTR_NSEC_FILE_PASSWORD").unwrap_or("MISSING".to_owned());
+
+    let keystore = KeyStore::new_from_encrypted_file(DEFAULT_SECRET_FILE, &nsec_password).unwrap();
     let nsec1 = keystore
         .get_secret_private_key()
         .map_err(|e| e.to_string())

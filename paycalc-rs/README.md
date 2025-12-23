@@ -5,6 +5,14 @@ Execute payments.
 
 ## Setup
 
+Build:
+
+```
+cd paycalc-rs && cargo build && cd ..
+```
+
+Set up environemnt, DB:
+
 ```
 sudo apt-get install cargo
 cp env-sample .env
@@ -13,9 +21,16 @@ cp env-sample .env
 Set `DB_DIR` in `.env` (e.g. to "./data").
 
 ```
-cd paycalc-rs && cargo build && cd ..
 ./paycalc-rs/target/debug/__setup_db
 mv ./data/_new_paycalc.db ./data/paycalc.db
+```
+
+Save Nostr secret for zapping:
+
+```
+cd payer && cargo build --bin main_nsec_tool && cd ..
+./payer/target/debug/main_nsec_tool --set [--weakpw]
+./payer/target/debug/main_nsec_tool
 ```
 
 ## Startup
