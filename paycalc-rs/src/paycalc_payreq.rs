@@ -1,8 +1,9 @@
-use crate::common::shorten_id;
-use crate::common_db::get_db_file;
-use crate::db_pc as db;
-use crate::dto_pc::{MinerSnapshot, PayRequest};
 use crate::payment_method::{adjusted_primary_id, determine_payment_method};
+
+use common_rs::common_db::get_db_file;
+use common_rs::db_pc as db;
+use common_rs::dto_pc::{MinerSnapshot, PayRequest};
+use payer::common::shorten_id;
 
 use dotenv;
 use rusqlite::{Connection, Transaction};

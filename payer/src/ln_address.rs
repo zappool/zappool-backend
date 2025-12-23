@@ -137,6 +137,7 @@ pub async fn get_invoice_from_ln_address(
     Ok(invoice)
 }
 
+#[allow(dead_code)]
 pub async fn do_try() {
     let invoice = get_invoice_from_ln_address(
         "npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg@npub.cash",

@@ -1,5 +1,5 @@
 /// Payment method
-use crate::common::PaymentMethod;
+use payer::common::PaymentMethod;
 
 use std::env;
 use std::error::Error;
@@ -90,8 +90,6 @@ pub fn adjusted_primary_id(
 
 #[cfg(test)]
 mod test {
-    use crate::common::PaymentMethod;
-
     use super::*;
 
     #[test]

@@ -1,11 +1,12 @@
 use crate::cln_pay::pay_invoice;
 use crate::common::{PaymentMethod, PaymentResult, shorten_id};
-use crate::common_db::get_db_file;
-use crate::db_pc as db;
-use crate::dto_pc::{PayRequest, Payment};
-use crate::error_codes::*;
 use crate::ln_address::get_invoice_from_ln_address;
 use crate::nostr_profile::get_nostr_ln_address;
+
+use common_rs::common_db::get_db_file;
+use common_rs::db_pc as db;
+use common_rs::dto_pc::{PayRequest, Payment};
+use common_rs::error_codes::*;
 
 use dotenv;
 use rusqlite::Connection;
@@ -46,7 +47,7 @@ pub fn print_last_payments(conn: &Connection, period_days: u32) -> Result<(), Bo
     Ok(())
 }
 
-async fn pay_lightning_invoice(
+pub async fn pay_lightning_invoice(
     invoice: &str,
     req_amnt: u64,
     label: &str,
