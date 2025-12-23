@@ -176,7 +176,7 @@ async fn get_nostr_ln_address_relay(
 }
 
 /// Get Lightning Address from multiple relays
-pub async fn get_nostr_ln_address(npub: &str) -> Result<Option<String>, Box<dyn Error>> {
+pub async fn get_nostr_ln_address(npub: &str) -> Result<String, Box<dyn Error>> {
     let relays = [
         "relay.damus.io",
         "relay.primal.net",
@@ -192,15 +192,16 @@ pub async fn get_nostr_ln_address(npub: &str) -> Result<Option<String>, Box<dyn 
     for relay in &relays {
         let relay_url = format!("wss://{}", relay);
         if let Ok(Some(ln_addr)) = get_nostr_ln_address_relay(npub, &relay_url).await {
-            return Ok(Some(ln_addr));
+            return Ok(ln_addr);
         }
     }
 
-    println!(
+    let err_msg = format!(
         "ERROR: Could not obtain LNAddr for '{}' (relays: {:?})",
         npub, relays
     );
-    Ok(None)
+    println!("{err_msg}");
+    Err(err_msg.into())
 }
 
 #[allow(dead_code)]
@@ -217,7 +218,7 @@ async fn do_try() -> Result<(), Box<dyn Error>> {
     println!("Fetching profile for {} from {}", npub, relay_url);
 
     // Test Lightning Address functionality
-    if let Ok(Some(lnaddr)) = get_nostr_ln_address(npub).await {
+    if let Ok(lnaddr) = get_nostr_ln_address(npub).await {
         println!("Lightning Address: {}", lnaddr);
     }
 

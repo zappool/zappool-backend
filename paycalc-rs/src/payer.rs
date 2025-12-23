@@ -29,11 +29,12 @@ pub fn print_last_payments(conn: &Connection, period_days: u32) -> Result<(), Bo
     for (pr, p) in &payms {
         let age_hr = ((now_utc - p.status_time) as f64) / 3600.0;
         println!(
-            "  {}  {:.1} \t {} {} \t {} {} {} {} '{}' '{}'",
+            "  {}  {:.1} \t {} {} \t {:4} {} {} {} {} '{}' '{}'",
             shorten_id(&pr.pri_id),
             age_hr,
             pr.req_amnt,
             p.paid_amnt,
+            pr.pay_method,
             p.status,
             p.retry_cnt,
             p.error_code,
@@ -60,54 +61,55 @@ async fn process_lightning_address_payment(
     pr: &PayRequest,
 ) -> Result<PaymentResult, Box<dyn Error>> {
     let ln_address = &pr.pri_id;
-    let (success, invoice, err_nonfinal, err_str) =
-        get_invoice_from_ln_address(&ln_address, pr.req_amnt).await?;
-    if !success || invoice.is_none() {
-        return if err_nonfinal {
-            Ok(PaymentResult::new(
-                false,
-                true,
-                ERROR_LN_ADDRESS_NONFINAL_FAILURE,
-                &err_str,
-                "",
-                "",
-                0,
-                0,
-                "",
-            ))
-        } else {
-            Ok(PaymentResult::new(
-                false,
-                false,
-                ERROR_LN_ADDRESS_FINAL_FAILURE,
-                &err_str,
-                "",
-                "",
-                0,
-                0,
-                "",
-            ))
-        };
-    }
-    // Success
-    let invoice = invoice.unwrap();
-    println!("Obtained LN invoice: ({invoice})");
-
-    let mut pay_res = pay_lightning_invoice(&invoice, pr.req_amnt, &pr.pri_id).await?;
-
-    pay_res.secon_id = invoice;
-    pay_res.terti_id = "".to_string();
-    pay_res.err_code = if !pay_res.success {
-        if pay_res.err_nonfinal {
-            ERROR_LN_BOLT11_INVOICE_NONFINAL_FAILURE
-        } else {
-            ERROR_LN_BOLT11_INVOICE_FINAL_FAILURE
+    match get_invoice_from_ln_address(&ln_address, pr.req_amnt).await {
+        Err((err_nonfinal, err)) => {
+            if err_nonfinal {
+                Ok(PaymentResult::new(
+                    false,
+                    true,
+                    ERROR_LN_ADDRESS_NONFINAL_FAILURE,
+                    &err.to_string(),
+                    "",
+                    "",
+                    0,
+                    0,
+                    "",
+                ))
+            } else {
+                Ok(PaymentResult::new(
+                    false,
+                    false,
+                    ERROR_LN_ADDRESS_FINAL_FAILURE,
+                    &err.to_string(),
+                    "",
+                    "",
+                    0,
+                    0,
+                    "",
+                ))
+            }
         }
-    } else {
-        ERROR_OK
-    };
+        Ok(invoice) => {
+            // Success
+            println!("Obtained LN invoice: ({invoice})");
 
-    Ok(pay_res)
+            let mut pay_res = pay_lightning_invoice(&invoice, pr.req_amnt, &pr.pri_id).await?;
+
+            pay_res.secon_id = invoice;
+            pay_res.terti_id = "".to_string();
+            pay_res.err_code = if !pay_res.success {
+                if pay_res.err_nonfinal {
+                    ERROR_LN_BOLT11_INVOICE_NONFINAL_FAILURE
+                } else {
+                    ERROR_LN_BOLT11_INVOICE_FINAL_FAILURE
+                }
+            } else {
+                ERROR_OK
+            };
+
+            Ok(pay_res)
+        }
+    }
 }
 
 // Handle a Nostr lightning payment
@@ -116,70 +118,72 @@ async fn process_nostr_lightning_payment(
     pr: &PayRequest,
 ) -> Result<PaymentResult, Box<dyn Error>> {
     let npub = &pr.pri_id;
-    let ln_address = &get_nostr_ln_address(npub).await?.unwrap_or("".into());
-    if ln_address.len() == 0 {
-        let err_str = format!("Could not obtain LN Address for npub, '{ln_address}' '{npub}'");
-        return Ok(PaymentResult::new(
-            false,
-            true,
-            ERROR_NOSTR_LN_ADDRESS_NONFINAL_FAILURE,
-            &err_str,
-            "",
-            "",
-            0,
-            0,
-            "",
-        ));
-    }
-    println!("Obtained LN Address: '{ln_address}'");
-
-    let (success, invoice, err_nonfinal, err_str) =
-        get_invoice_from_ln_address(ln_address, pr.req_amnt).await?;
-    if !success || invoice.is_none() {
-        if err_nonfinal {
+    let ln_address = match get_nostr_ln_address(npub).await {
+        Err(e) => {
             return Ok(PaymentResult::new(
                 false,
                 true,
-                ERROR_LN_ADDRESS_NONFINAL_FAILURE,
-                &err_str,
-                ln_address,
+                ERROR_NOSTR_LN_ADDRESS_NONFINAL_FAILURE,
+                &e.to_string(),
+                "",
                 "",
                 0,
                 0,
                 "",
             ));
-        } else {
-            return Ok(PaymentResult::new(
-                false,
-                false,
-                ERROR_LN_ADDRESS_FINAL_FAILURE,
-                &err_str,
-                ln_address,
-                "",
-                0,
-                0,
-                "",
-            ));
+        }
+        Ok(a) => a,
+    };
+    println!("Obtained LN Address: '{ln_address}'");
+
+    match get_invoice_from_ln_address(&ln_address, pr.req_amnt).await {
+        Err((err_nonfinal, err)) => {
+            if err_nonfinal {
+                return Ok(PaymentResult::new(
+                    false,
+                    true,
+                    ERROR_LN_ADDRESS_NONFINAL_FAILURE,
+                    &err.to_string(),
+                    &ln_address,
+                    "",
+                    0,
+                    0,
+                    "",
+                ));
+            } else {
+                return Ok(PaymentResult::new(
+                    false,
+                    false,
+                    ERROR_LN_ADDRESS_FINAL_FAILURE,
+                    &err.to_string(),
+                    &ln_address,
+                    "",
+                    0,
+                    0,
+                    "",
+                ));
+            }
+        }
+        Ok(invoice) => {
+            // Success
+            println!("Obtained LN invoice: ({invoice})");
+
+            let mut pay_res = pay_lightning_invoice(&invoice, pr.req_amnt, &pr.pri_id).await?;
+            pay_res.secon_id = ln_address.to_string();
+            pay_res.terti_id = invoice;
+            pay_res.err_code = if !pay_res.success {
+                if pay_res.err_nonfinal {
+                    ERROR_LN_BOLT11_INVOICE_NONFINAL_FAILURE
+                } else {
+                    ERROR_LN_BOLT11_INVOICE_FINAL_FAILURE
+                }
+            } else {
+                ERROR_OK
+            };
+
+            Ok(pay_res)
         }
     }
-    let invoice = invoice.unwrap();
-    // Success
-    println!("Obtained LN invoice: ({invoice})");
-
-    let mut pay_res = pay_lightning_invoice(&invoice, pr.req_amnt, &pr.pri_id).await?;
-    pay_res.secon_id = ln_address.to_string();
-    pay_res.terti_id = invoice;
-    pay_res.err_code = if !pay_res.success {
-        if pay_res.err_nonfinal {
-            ERROR_LN_BOLT11_INVOICE_NONFINAL_FAILURE
-        } else {
-            ERROR_LN_BOLT11_INVOICE_FINAL_FAILURE
-        }
-    } else {
-        ERROR_OK
-    };
-
-    Ok(pay_res)
 }
 
 //. Handle a payment by method
