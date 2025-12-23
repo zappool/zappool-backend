@@ -14,16 +14,28 @@ struct CallbackResponseData {
     pr: Option<String>,
 }
 
+pub fn ln_p_url_from_address(ln_address: &str) -> Result<String, Box<dyn Error>> {
+    // Parse the Lightning Address
+    let parts = ln_address.split("@").collect::<Vec<&str>>();
+    if parts.len() < 2 {
+        return Err(format!("Invalid Lightning Address format: '{ln_address}'").into());
+    }
+    let username = parts[0];
+    let domain = parts[1];
+
+    // Step 1: Construct and request the Lightning Address URL
+    let lnurlp_url = format!("https://{domain}/.well-known/lnurlp/{username}");
+    Ok(lnurlp_url)
+}
+
 // Retrieve a BOLT11 incvoice from a Lightning Address
-// Return:
-// - success flag
-// - invoice
+// In case of error, return:
 // - if the error is nonfinal
-// - error text
+// - the error
 pub async fn get_invoice_from_ln_address(
     ln_address: &str,
     amount_msats: u64,
-) -> Result<(bool, Option<String>, bool, String), Box<dyn Error>> {
+) -> Result<String, (bool, Box<dyn Error>)> {
     // Retrieve a BOLT11 invoice from a Lightning Address.
     //
     // Args:
@@ -35,53 +47,37 @@ pub async fn get_invoice_from_ln_address(
 
     println!("Processing LN address {ln_address} ...");
 
-    // Parse the Lightning Address
-    let parts = ln_address.split("@").collect::<Vec<&str>>();
-    if parts.len() < 2 {
-        return Ok((
-            false,
-            None,
-            false,
-            format!("Invalid Lightning Address format: '{ln_address}'"),
-        ));
-    }
-    let username = parts[0];
-    let domain = parts[1];
-
     // Step 1: Construct and request the Lightning Address URL
-    let lnurlp_url = &format!("https://{domain}/.well-known/lnurlp/{username}");
+    let lnurlp_url = &ln_p_url_from_address(ln_address).map_err(|e| (false, e.into()))?;
 
     // Make the initial request to get the LNURL metadata
     let resp = match reqwest::get(lnurlp_url).await {
         Err(e) => {
-            return Ok((
-                false,
-                None,
+            return Err((
                 true,
-                format!("HTTP request failed: {} {:?}", lnurlp_url, e),
+                format!("HTTP request failed: {} {:?}", lnurlp_url, e).into(),
             ));
         }
         Ok(r) => r,
     };
     if resp.status() != reqwest::StatusCode::OK {
-        return Ok((
-            false,
-            None,
+        return Err((
             true,
-            format!("HTTP request failed: {} {}", resp.status(), lnurlp_url),
+            format!("HTTP request failed: {} {}", resp.status(), lnurlp_url).into(),
         ));
     }
-    let lnurlp_data = resp.json::<LnurlResponseData>().await?;
+    let lnurlp_data = resp
+        .json::<LnurlResponseData>()
+        .await
+        .map_err(|e| (true, e.into()))?;
     // println!("lnurlp_data {:?}", lnurlp_data);
 
     // Extract the callback URL
     let callback_url = match lnurlp_data.callback {
         None => {
-            return Ok((
-                false,
-                None,
+            return Err((
                 true,
-                format!("Missing callback: {} {:?}", lnurlp_url, lnurlp_data),
+                format!("Missing callback: {} {:?}", lnurlp_url, lnurlp_data).into(),
             ));
         }
         Some(c) => c,
@@ -93,19 +89,15 @@ pub async fn get_invoice_from_ln_address(
     let max_sendable = lnurlp_data.max_sendable.unwrap_or(u64::max_value());
 
     if amount_msats < min_sendable {
-        return Ok((
+        return Err((
             false,
-            None,
-            false,
-            format!("Amount {amount_msats} is below the minimum allowed: {min_sendable}"),
+            format!("Amount {amount_msats} is below the minimum allowed: {min_sendable}").into(),
         ));
     }
     if amount_msats > max_sendable {
-        return Ok((
+        return Err((
             false,
-            None,
-            false,
-            format!("Amount {amount_msats} is above the maximum allowed: {max_sendable}"),
+            format!("Amount {amount_msats} is above the maximum allowed: {max_sendable}").into(),
         ));
     }
 
@@ -116,42 +108,42 @@ pub async fn get_invoice_from_ln_address(
 
     let resp = match reqwest::get(callback_with_amount).await {
         Err(e) => {
-            return Ok((
-                false,
-                None,
+            return Err((
                 true,
-                format!("HTTP request failed: {} {:?}", callback_with_amount, e),
+                format!("HTTP request failed: {} {:?}", callback_with_amount, e).into(),
             ));
         }
         Ok(r) => r,
     };
 
-    let callback_data = resp.json::<CallbackResponseData>().await?;
+    let callback_data = resp
+        .json::<CallbackResponseData>()
+        .await
+        .map_err(|e| (true, e.into()))?;
     // println!("callback_data {:?}", callback_data);
 
     // Check if the response contains a BOLT11 invoice
     let invoice = match callback_data.pr {
         None => {
-            return Ok((
+            return Err((
                 false,
-                None,
-                false,
-                format!("Invalid callback response: missing 'pr' field (BOLT11 invoice)"),
+                format!("Invalid callback response: missing 'pr' field (BOLT11 invoice)").into(),
             ));
         }
         Some(i) => i,
     };
 
     // Return the BOLT11 invoice
-    Ok((true, Some(invoice), false, "".to_string()))
+    Ok(invoice)
 }
 
+#[allow(dead_code)]
 pub async fn do_try() {
-    let (_success, invoice, _nonfinal, _error) = get_invoice_from_ln_address(
+    let invoice = get_invoice_from_ln_address(
         "npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg@npub.cash",
         5000,
     )
     .await
     .unwrap();
-    println!("Invoice: {}", invoice.unwrap());
+    println!("Invoice: {}", invoice);
 }

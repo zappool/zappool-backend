@@ -4,3 +4,5 @@ backup
 _new*.db
 .env
 venv
+secret.nsec
+

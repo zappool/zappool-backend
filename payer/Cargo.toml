@@ -1,0 +1,25 @@
+[package]
+name = "payer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bech32 = "0.9"
+cln-rpc = "0.5.0"
+common-rs = { path = "../common-rs" }
+dotenv = "0.15.0"
+futures-util = "0.3"
+hex-conservative = "0.3.0"
+nostr = { version = "0.44.2", features = ["nip57"] }
+reqwest = { version = "0.12.26", features = ["json"] }
+rpassword = "7.4.0"
+rusqlite = "0.37.0"
+secp256k1 = "0.29.1"
+seedstore = { version = "1.1.0", features = ["accesssecret"] }
+serde = "1.0.228"
+serde_json = "1.0"
+tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }
+tokio-tungstenite = { version = "0.20", features = ["native-tls"] }
+urlencoding = "2.1.3"
+uuid = { version = "1.0", features = ["v4"] }
+
