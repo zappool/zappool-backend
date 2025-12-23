@@ -9,7 +9,7 @@ use bech32::{FromBase32, ToBase32, encode};
 use nostr::nips::nip57::ZapRequestData;
 use nostr::secp256k1::Secp256k1;
 use nostr::util::JsonUtil;
-use nostr::{Event, EventBuilder, Keys, PublicKey, RelayUrl, SecretKey};
+use nostr::{EventBuilder, Keys, PublicKey, RelayUrl, SecretKey};
 
 use std::error::Error;
 use std::str::FromStr;
@@ -39,7 +39,7 @@ struct CallbackResponseData {
 pub async fn get_zap_invoice(
     ln_address: &str,
     amount_msats: u64,
-    zap_event: &Event,
+    zap_event_str: &str,
 ) -> Result<String, (bool, Box<dyn Error>)> {
     // Retrieve a BOLT11 invoice from a Lightning Address.
     //
@@ -116,9 +116,8 @@ pub async fn get_zap_invoice(
     // str(lnurl.Lnurl(lnaddr_url).bech32).lower()
     // print(lnurl_bech32)
 
-    let zap_event_serialized = &zap_event.as_json().to_string();
-    let zap_event_serialized_quoted = urlencoding::encode(&zap_event_serialized);
-    println!("Zap event as string: '{zap_event_serialized_quoted}' '{zap_event_serialized}'");
+    let zap_event_serialized_quoted = urlencoding::encode(&zap_event_str);
+    println!("Zap event as string: '{zap_event_serialized_quoted}' '{zap_event_str}'");
 
     let lnurlp_url_bech = encode(
         "lnurl",
@@ -217,8 +216,9 @@ pub async fn nostr_zap(
     let zap_event = builder
         .sign_with_keys(&Keys::new(sender_nsec.clone()))
         .map_err(|e| (false, e.into()))?;
+    let zap_event_serialized = &zap_event.as_json().to_string();
 
-    let invoice = get_zap_invoice(&ln_address, amount_msat, &zap_event).await?;
+    let invoice = get_zap_invoice(&ln_address, amount_msat, &zap_event_serialized).await?;
     println!("Obtained ZAP invoice to be paid:   '{invoice}'");
 
     let mut pay_res = pay_lightning_invoice(&invoice, amount_msat, &rec_npub)
