@@ -250,3 +250,18 @@ pub async fn nostr_zap(
 
     Ok(pay_res)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_npub_from_secret_vec() {
+        let dummy_nsec_vec = [7u8; 32].to_vec();
+        let npub = npub_from_secret_vec(&dummy_nsec_vec).unwrap();
+        assert_eq!(
+            npub,
+            "npub1nzwqkakt2cuhrlwfhme3asrvx4s0xfyadm57tkpu2a39t9hqtahs7fsn89"
+        );
+    }
+}

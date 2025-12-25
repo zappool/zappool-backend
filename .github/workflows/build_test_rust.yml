@@ -21,5 +21,7 @@ jobs:
     - name: Build Rust
       run: cd paycalc-rs && cargo build
     - name: Run unit tests
-      run: cd paycalc-rs && cargo test
+      run: |
+        cd payer && cargo test && cd ..
+        cd paycalc-rs && cargo test && cd ..
 
