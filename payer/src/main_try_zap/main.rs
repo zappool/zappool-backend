@@ -21,9 +21,7 @@ async fn main() {
         .unwrap();
     let nsec = SecretKey::from_slice(&nsec1.secret_bytes()).unwrap();
 
-    let rec_npub =
-        "npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg"
-    ;
+    let rec_npub = "npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg";
     let relays = vec![
         "wss://relay.primal.net/",
         "wss://relay.damus.io/",

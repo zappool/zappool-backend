@@ -166,17 +166,28 @@ pub async fn get_zap_invoice(
     Ok(invoice)
 }
 
+/// Helper: npub from nsec
+fn npub_from_secret_obj(secret_key: &SecretKey) -> Result<String, Box<dyn Error>> {
+    let secp = Secp256k1::new();
+    let pubkey = secret_key.x_only_public_key(&secp).0.serialize();
+    let npub = encode("npub", pubkey.to_base32(), bech32::Variant::Bech32)?;
+    Ok(npub)
+}
+
+/// Helper: npub from nsec vec
+pub fn npub_from_secret_vec(secret_key_vec: &Vec<u8>) -> Result<String, Box<dyn Error>> {
+    let secret_key_obj = SecretKey::from_slice(&secret_key_vec)?;
+    npub_from_secret_obj(&secret_key_obj)
+}
+
 pub async fn nostr_zap(
     amount_msat: u64,
     sender_nsec: &SecretKey,
     rec_npub: &str,
     relays: &Vec<&str>,
 ) -> Result<PaymentResult, (bool, Box<dyn Error>)> {
-    let secp = Secp256k1::new();
-    let sender_pubkey = sender_nsec.x_only_public_key(&secp).0.serialize();
-    let sender_npub = encode("npub", sender_pubkey.to_base32(), bech32::Variant::Bech32)
-        .map_err(|e| (false, e.into()))?;
-
+    let sender_npub = npub_from_secret_obj(sender_nsec)
+    .map_err(|e| (false, e.into()))?;
     println!("nostr_zap:  {amount_msat}  from {sender_npub}  to {rec_npub}");
 
     let ln_address = get_nostr_ln_address(rec_npub)

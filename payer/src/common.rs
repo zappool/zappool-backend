@@ -35,6 +35,10 @@ impl FromStr for PaymentMethod {
     }
 }
 
+pub struct PayerParameters {
+    pub nostr_secret_key: Vec<u8>,
+}
+
 pub struct PaymentResult {
     pub success: bool,
     pub err_nonfinal: bool,

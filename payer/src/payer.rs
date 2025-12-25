@@ -1,7 +1,8 @@
 use crate::cln_pay::pay_invoice;
-use crate::common::{PaymentMethod, PaymentResult, shorten_id};
+use crate::common::{PayerParameters, PaymentMethod, PaymentResult, shorten_id};
 use crate::ln_address::get_invoice_from_ln_address;
 use crate::nostr_profile::get_nostr_ln_address;
+use crate::nostr_zap::{nostr_zap, npub_from_secret_vec};
 
 use common_rs::common_db::get_db_file;
 use common_rs::db_pc as db;
@@ -9,14 +10,30 @@ use common_rs::dto_pc::{PayRequest, Payment};
 use common_rs::error_codes::*;
 
 use dotenv;
+use nostr::key::SecretKey;
 use rusqlite::Connection;
+use seedstore::KeyStore;
 
+use std::env;
 use std::error::Error;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const RETRY_DELAY: u32 = 600;
 const PAYMENT_RETRIES_MAX: u32 = 10;
+const DEFAULT_SECRET_FILE: &str = "secret.nsec";
+
+pub fn get_nostr_secret_from_config() -> Result<Vec<u8>, Box<dyn Error>> {
+    // Load environment variables from .env file
+    dotenv::dotenv().ok();
+    let nsec_password = env::var("NOSTR_NSEC_FILE_PASSWORD").unwrap_or("MISSING".to_owned());
+
+    let keystore = KeyStore::new_from_encrypted_file(DEFAULT_SECRET_FILE, &nsec_password)?;
+    let nsec1 = keystore
+        .get_secret_private_key()
+        ?.secret_bytes().to_vec();
+    Ok(nsec1)
+}
 
 pub fn print_last_payments(conn: &Connection, period_days: u32) -> Result<(), Box<dyn Error>> {
     let now_utc = SystemTime::now()
@@ -187,10 +204,58 @@ async fn process_nostr_lightning_payment(
     }
 }
 
+// Handle a Nostr Zap payment
+async fn process_nostr_zap_payment(
+    _paym: &Payment,
+    pr: &PayRequest,
+    payer_params: &PayerParameters,
+) -> Result<PaymentResult, Box<dyn Error>> {
+    let sender_nsec = SecretKey::from_slice(&payer_params.nostr_secret_key)?;
+    let rec_npub = &pr.pri_id;
+    // TODO dynamic list
+    let relays = vec![
+        "wss://relay.primal.net/",
+        "wss://relay.damus.io/",
+        "wss://nos.lol/",
+    ];
+
+    match nostr_zap(pr.req_amnt, &sender_nsec, rec_npub, &relays).await {
+        Err((non_final, err)) => {
+            return if non_final {
+                Ok(PaymentResult::new(
+                    false,
+                    true,
+                    ERROR_NOSTR_ZAP_NONFINAL_FAILURE,
+                    &err.to_string(),
+                    "",
+                    "",
+                    0,
+                    0,
+                    "",
+                ))
+            } else {
+                Ok(PaymentResult::new(
+                    false,
+                    false,
+                    ERROR_NOSTR_ZAP_FINAL_FAILURE,
+                    &err.to_string(),
+                    "",
+                    "",
+                    0,
+                    0,
+                    "",
+                ))
+            };
+        }
+        Ok(res) => Ok(res),
+    }
+}
+
 //. Handle a payment by method
 async fn process_payment_generic(
     paym: &Payment,
     pr: &PayRequest,
+    payer_params: &PayerParameters,
 ) -> Result<PaymentResult, Box<dyn Error>> {
     if pr.pay_method == PaymentMethod::PmLnAddress.to_string() {
         return process_lightning_address_payment(paym, pr).await;
@@ -199,8 +264,7 @@ async fn process_payment_generic(
         return process_nostr_lightning_payment(paym, pr).await;
     }
     if pr.pay_method == PaymentMethod::PmNostrZap.to_string() {
-        // TODO use specialized zap method
-        return process_nostr_lightning_payment(paym, pr).await;
+        return process_nostr_zap_payment(paym, pr, payer_params).await;
     }
     Ok(PaymentResult::new(
         false,
@@ -227,6 +291,7 @@ fn save_payment(conn: &mut Connection, paym: &mut Payment) -> Result<(), Box<dyn
 }
 
 async fn process_payment_start(
+    payer_params: &PayerParameters,
     conn: &mut Connection,
     pr: &PayRequest,
     paym_orig: &Option<Payment>,
@@ -305,7 +370,7 @@ async fn process_payment_start(
 
     let _ = save_payment(conn, &mut paym)?;
 
-    let pay_res = process_payment_generic(&paym, pr).await?;
+    let pay_res = process_payment_generic(&paym, pr, payer_params).await?;
 
     // Process and store error
     let now_utc = SystemTime::now()
@@ -372,25 +437,35 @@ async fn process_payment_start(
     Ok(())
 }
 
-async fn iteration(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+async fn iteration(payer_params: &PayerParameters, conn: &mut Connection) -> Result<(), Box<dyn Error>> {
     let open_requests = db::payreq_get_all_non_final(conn)?;
     if !open_requests.is_empty() {
         println!("Open pay requests: {}", open_requests.len());
         for (pr, paym) in &open_requests {
-            let _ = process_payment_start(conn, pr, paym).await?;
+            let _ = process_payment_start(payer_params, conn, pr, paym).await?;
         }
     }
     Ok(())
 }
 
 pub async fn loop_iterations() -> Result<(), Box<dyn Error>> {
+    println!("Payer: initializing ...");
+
+    let nostr_secret_key = get_nostr_secret_from_config()?;
+    let nostr_pub = npub_from_secret_vec(&nostr_secret_key)?;
+    println!("Nostr secret key read from config, npub: {nostr_pub}");
+
+    let payer_params = PayerParameters {
+        nostr_secret_key,
+    };
+
     // Load environment variables from .env file
     dotenv::dotenv().ok();
 
     let dbfile = get_db_file("paycalc.db", false);
     let mut conn = Connection::open(&dbfile)?;
 
-    println!("Payer: loop starting");
+    println!("Payer: loop starting ...");
 
     let sleep_secs = 5;
     let mut next_time = SystemTime::now()
@@ -399,7 +474,7 @@ pub async fn loop_iterations() -> Result<(), Box<dyn Error>> {
         .as_secs_f64();
 
     loop {
-        match iteration(&mut conn).await {
+        match iteration(&payer_params, &mut conn).await {
             Ok(_) => {}
             Err(e) => {
                 println!("ERROR in iteration, {:?}", e);
