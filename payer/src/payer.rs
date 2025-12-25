@@ -10,7 +10,6 @@ use common_rs::dto_pc::{PayRequest, Payment};
 use common_rs::error_codes::*;
 
 use dotenv;
-use nostr::key::SecretKey;
 use rusqlite::Connection;
 use seedstore::KeyStore;
 
@@ -29,9 +28,7 @@ pub fn get_nostr_secret_from_config() -> Result<Vec<u8>, Box<dyn Error>> {
     let nsec_password = env::var("NOSTR_NSEC_FILE_PASSWORD").unwrap_or("MISSING".to_owned());
 
     let keystore = KeyStore::new_from_encrypted_file(DEFAULT_SECRET_FILE, &nsec_password)?;
-    let nsec1 = keystore
-        .get_secret_private_key()
-        ?.secret_bytes().to_vec();
+    let nsec1 = keystore.get_secret_private_key()?.secret_bytes().to_vec();
     Ok(nsec1)
 }
 
@@ -210,7 +207,6 @@ async fn process_nostr_zap_payment(
     pr: &PayRequest,
     payer_params: &PayerParameters,
 ) -> Result<PaymentResult, Box<dyn Error>> {
-    let sender_nsec = SecretKey::from_slice(&payer_params.nostr_secret_key)?;
     let rec_npub = &pr.pri_id;
     // TODO dynamic list
     let relays = vec![
@@ -219,7 +215,14 @@ async fn process_nostr_zap_payment(
         "wss://nos.lol/",
     ];
 
-    match nostr_zap(pr.req_amnt, &sender_nsec, rec_npub, &relays).await {
+    match nostr_zap(
+        pr.req_amnt,
+        &payer_params.nostr_secret_key,
+        rec_npub,
+        &relays,
+    )
+    .await
+    {
         Err((non_final, err)) => {
             return if non_final {
                 Ok(PaymentResult::new(
@@ -437,7 +440,10 @@ async fn process_payment_start(
     Ok(())
 }
 
-async fn iteration(payer_params: &PayerParameters, conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+async fn iteration(
+    payer_params: &PayerParameters,
+    conn: &mut Connection,
+) -> Result<(), Box<dyn Error>> {
     let open_requests = db::payreq_get_all_non_final(conn)?;
     if !open_requests.is_empty() {
         println!("Open pay requests: {}", open_requests.len());
@@ -455,9 +461,7 @@ pub async fn loop_iterations() -> Result<(), Box<dyn Error>> {
     let nostr_pub = npub_from_secret_vec(&nostr_secret_key)?;
     println!("Nostr secret key read from config, npub: {nostr_pub}");
 
-    let payer_params = PayerParameters {
-        nostr_secret_key,
-    };
+    let payer_params = PayerParameters { nostr_secret_key };
 
     // Load environment variables from .env file
     dotenv::dotenv().ok();

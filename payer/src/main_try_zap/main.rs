@@ -1,7 +1,6 @@
 use payer::nostr_zap::nostr_zap;
 
 use dotenv;
-use nostr::SecretKey;
 use seedstore::KeyStore;
 
 use std::env;
@@ -15,11 +14,12 @@ async fn main() {
     let nsec_password = env::var("NOSTR_NSEC_FILE_PASSWORD").unwrap_or("MISSING".to_owned());
 
     let keystore = KeyStore::new_from_encrypted_file(DEFAULT_SECRET_FILE, &nsec_password).unwrap();
-    let nsec1 = keystore
+    let nsec = keystore
         .get_secret_private_key()
         .map_err(|e| e.to_string())
-        .unwrap();
-    let nsec = SecretKey::from_slice(&nsec1.secret_bytes()).unwrap();
+        .unwrap()
+        .secret_bytes()
+        .to_vec();
 
     let rec_npub = "npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg";
     let relays = vec![

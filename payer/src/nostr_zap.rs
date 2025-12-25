@@ -182,12 +182,12 @@ pub fn npub_from_secret_vec(secret_key_vec: &Vec<u8>) -> Result<String, Box<dyn 
 
 pub async fn nostr_zap(
     amount_msat: u64,
-    sender_nsec: &SecretKey,
+    sender_nsec_vec: &Vec<u8>,
     rec_npub: &str,
     relays: &Vec<&str>,
 ) -> Result<PaymentResult, (bool, Box<dyn Error>)> {
-    let sender_npub = npub_from_secret_obj(sender_nsec)
-    .map_err(|e| (false, e.into()))?;
+    let sender_nsec = SecretKey::from_slice(sender_nsec_vec).map_err(|e| (false, e.into()))?;
+    let sender_npub = npub_from_secret_obj(&sender_nsec).map_err(|e| (false, e.into()))?;
     println!("nostr_zap:  {amount_msat}  from {sender_npub}  to {rec_npub}");
 
     let ln_address = get_nostr_ln_address(rec_npub)
