@@ -22,3 +22,12 @@ Use your BitAxe to generate daily sats ready for zapping!
 - [paycalc-rs](paycalc-rs/README.md): Calculate payments, from work items and block rewards.
 - [payer]: Execure payments. Separate library, but executed with paycalc-rs.
 
+
+## Roadmap
+
+- 0.4 Payout as Zap
+- 0.4 Refactor: Payer service in Rust
+- User Dashboard with Nostr login
+- Beefed-up Dashboard
+- User Settings
+
