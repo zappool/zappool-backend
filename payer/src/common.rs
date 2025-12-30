@@ -2,6 +2,7 @@ use std::error::Error;
 use std::str::FromStr;
 
 /// Payment methods
+/// See also: payment_methods
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PaymentMethod {
     /// Lightning Address: Lightning Address -> Lightning payment
@@ -11,6 +12,15 @@ pub enum PaymentMethod {
     /// Nostr Zap: NPub -> Nostr Profile -> Lightning Address -> Lightning payment with Zap
     PmNostrZap,
 }
+
+/// Return all payment methods
+pub fn payment_methods() -> Vec<&'static PaymentMethod> { PAYMENT_METHODS.to_vec() }
+
+const PAYMENT_METHODS: &'static [&'static PaymentMethod] = &[
+    &PaymentMethod::PmLnAddress,
+    &PaymentMethod::PmNostrLightning,
+    &PaymentMethod::PmNostrZap,
+];
 
 impl ToString for PaymentMethod {
     fn to_string(&self) -> String {
@@ -26,12 +36,12 @@ impl ToString for PaymentMethod {
 impl FromStr for PaymentMethod {
     type Err = Box<dyn Error>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "LNAD" => Ok(PaymentMethod::PmLnAddress),
-            "NOLN" => Ok(PaymentMethod::PmNostrLightning),
-            "ZAP" => Ok(PaymentMethod::PmNostrZap),
-            _ => Err(format!("Unknown payment method {s}").into()),
+        for pm in PAYMENT_METHODS {
+            if s == pm.to_string() {
+                return Ok(**pm);
+            }
         }
+        Err(format!("Unknown payment method {s}").into())
     }
 }
 

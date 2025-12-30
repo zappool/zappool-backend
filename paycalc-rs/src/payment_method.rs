@@ -1,5 +1,5 @@
 /// Payment method
-use payer::common::PaymentMethod;
+use payer::common::{PaymentMethod, payment_methods};
 
 use std::env;
 use std::error::Error;
@@ -41,8 +41,20 @@ fn sanitize_primary_id(id: String) -> String {
 /// Guess the payment method, adjust the primary ID
 /// Return: payment method
 fn guess_payment_method(orig_payment_id: &str) -> Result<PaymentMethod, Box<dyn Error>> {
-    if orig_payment_id.starts_with("LA:") {
-        return Ok(PaymentMethod::PmLnAddress);
+    if orig_payment_id.contains(":") {
+        // payment method prefix, e.g. "NOLN:"
+        let prefix = orig_payment_id.split(":").next().unwrap_or_default();
+
+        for pm in payment_methods() {
+            if prefix == pm.to_string() {
+                return Ok(*pm);
+            }
+        }
+
+        // legacy "LA:" lightning address marker
+        if prefix == "LA" {
+            return Ok(PaymentMethod::PmLnAddress);
+        }
     }
     // If it has '@', assume it is LA
     if orig_payment_id.contains("@") {
@@ -76,16 +88,31 @@ pub fn adjusted_primary_id(
     payment_method: PaymentMethod,
     orig_payment_id: &str,
 ) -> Result<String, Box<dyn Error>> {
-    if payment_method == PaymentMethod::PmLnAddress {
-        if orig_payment_id.starts_with("LA:") {
-            let payment_id = sanitize_primary_id(orig_payment_id[3..].to_string());
-            return Ok(payment_id);
+    // remove prefix if present
+    let without_prefix = if orig_payment_id.contains(":") {
+        let prefix = orig_payment_id.split(":").next().unwrap_or_default();
+        if prefix == payment_method.to_string() {
+            // has a prefix, matching the payment method, remove it
+            &orig_payment_id[(prefix.len() + 1)..]
+        } else {
+            // special case: legacy "LA:"
+            if payment_method == PaymentMethod::PmLnAddress && prefix == "LA" {
+                &orig_payment_id[3..]
+            } else {
+                // no change
+                orig_payment_id
+            }
         }
-        let payment_id = sanitize_primary_id(orig_payment_id.to_string());
+    } else {
+        orig_payment_id
+    };
+    // Lightning address: character conversions
+    if payment_method == PaymentMethod::PmLnAddress {
+        let payment_id = sanitize_primary_id(without_prefix.to_string());
         return Ok(payment_id);
     }
-    // default: no change
-    Ok(orig_payment_id.to_owned())
+    // no change
+    Ok(without_prefix.to_owned())
 }
 
 #[cfg(test)]
@@ -144,6 +171,22 @@ mod test {
             assert_eq!(r, PaymentMethod::PmLnAddress);
         }
         {
+            // payment method marker, 'LNAD:' lightning address
+            let r = guess_payment_method("LNAD:zappool@blink_sv").unwrap();
+            assert_eq!(r, PaymentMethod::PmLnAddress);
+        }
+        {
+            // payment method marker, 'NOLN:' nostr lightning
+            let r = guess_payment_method(&format!("NOLN:{}", NOSTR_ID1)).unwrap();
+            assert_eq!(r, PaymentMethod::PmNostrLightning);
+        }
+        {
+            // payment method marker, 'ZAP:' nostr zap
+            let r = guess_payment_method(&format!("ZAP:{}", NOSTR_ID1)).unwrap();
+            assert_eq!(r, PaymentMethod::PmNostrZap);
+        }
+        {
+            // legacy lightning address "LA:" marker
             let r = guess_payment_method("LA:zappool@blink_sv").unwrap();
             assert_eq!(r, PaymentMethod::PmLnAddress);
         }
@@ -189,6 +232,27 @@ mod test {
             let r = adjusted_primary_id(PaymentMethod::PmNostrLightning, "LA:zappool@blink_sv")
                 .unwrap();
             assert_eq!(r, "LA:zappool@blink_sv");
+        }
+        {
+            // with prefix
+            let r =
+                adjusted_primary_id(PaymentMethod::PmLnAddress, "LNAD:zappool@blink_sv").unwrap();
+            assert_eq!(r, "zappool@blink.sv");
+        }
+        {
+            // with prefix
+            let r = adjusted_primary_id(
+                PaymentMethod::PmNostrLightning,
+                &format!("NOLN:{}", NOSTR_ID1),
+            )
+            .unwrap();
+            assert_eq!(r, NOSTR_ID1);
+        }
+        {
+            // with prefix
+            let r = adjusted_primary_id(PaymentMethod::PmNostrZap, &format!("ZAP:{}", NOSTR_ID1))
+                .unwrap();
+            assert_eq!(r, NOSTR_ID1);
         }
     }
 }
