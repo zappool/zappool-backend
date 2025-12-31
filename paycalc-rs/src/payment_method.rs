@@ -32,6 +32,16 @@ fn get_user_method_setting_override(userid: u32) -> Option<PaymentMethod> {
     }
 }
 
+pub fn get_default_payment_method_from_env() -> Result<PaymentMethod, Box<dyn Error>> {
+    // Load environment variables from .env file
+    dotenv::dotenv().ok();
+
+    Ok(
+        PaymentMethod::from_str(&env::var("DEFAULT_PAYMENT_METHOD").unwrap_or_default())
+            .unwrap_or(PaymentMethod::PmNostrLightning),
+    )
+}
+
 /// Sanitize primary ID, such as:
 /// - Replace "_" characters with "." (dot cannot appear in miner username, as it's the worker separator)
 fn sanitize_primary_id(id: String) -> String {
@@ -40,33 +50,34 @@ fn sanitize_primary_id(id: String) -> String {
 
 /// Guess the payment method, adjust the primary ID
 /// Return: payment method
-fn guess_payment_method(orig_payment_id: &str) -> Result<PaymentMethod, Box<dyn Error>> {
+fn guess_payment_method(orig_payment_id: &str) -> Result<Option<PaymentMethod>, Box<dyn Error>> {
     if orig_payment_id.contains(":") {
         // payment method prefix, e.g. "NOLN:"
         let prefix = orig_payment_id.split(":").next().unwrap_or_default();
 
         for pm in payment_methods() {
             if prefix == pm.to_string() {
-                return Ok(*pm);
+                return Ok(Some(*pm));
             }
         }
 
         // legacy "LA:" lightning address marker
         if prefix == "LA" {
-            return Ok(PaymentMethod::PmLnAddress);
+            return Ok(Some(PaymentMethod::PmLnAddress));
         }
     }
     // If it has '@', assume it is LA
     if orig_payment_id.contains("@") {
-        return Ok(PaymentMethod::PmLnAddress);
+        return Ok(Some(PaymentMethod::PmLnAddress));
     }
-    // default: Nostr
-    Ok(PaymentMethod::PmNostrLightning)
+    // No guess, default
+    Ok(None)
 }
 
 pub fn determine_payment_method(
     userid: u32,
     orig_payment_id: &str,
+    default_payment_method: PaymentMethod,
 ) -> Result<PaymentMethod, Box<dyn Error>> {
     if let Some(override_pm) = get_user_method_setting_override(userid) {
         println!(
@@ -77,6 +88,7 @@ pub fn determine_payment_method(
     }
     // TODO if guessed is Nostr, check user setting from Nostr
     let guessed_pm = guess_payment_method(orig_payment_id)?;
+    let guessed_pm = guessed_pm.unwrap_or(default_payment_method);
     println!(
         "Using guessed payment method {:?} for user {}",
         guessed_pm, userid,
@@ -164,43 +176,49 @@ mod test {
         {
             let s = NOSTR_ID1;
             let r = guess_payment_method(s).unwrap();
-            assert_eq!(r, PaymentMethod::PmNostrLightning);
+            assert_eq!(r, None);
         }
         {
             let r = guess_payment_method("zappool@blink_sv").unwrap();
-            assert_eq!(r, PaymentMethod::PmLnAddress);
+            assert_eq!(r, Some(PaymentMethod::PmLnAddress));
         }
         {
             // payment method marker, 'LNAD:' lightning address
             let r = guess_payment_method("LNAD:zappool@blink_sv").unwrap();
-            assert_eq!(r, PaymentMethod::PmLnAddress);
+            assert_eq!(r, Some(PaymentMethod::PmLnAddress));
         }
         {
             // payment method marker, 'NOLN:' nostr lightning
             let r = guess_payment_method(&format!("NOLN:{}", NOSTR_ID1)).unwrap();
-            assert_eq!(r, PaymentMethod::PmNostrLightning);
+            assert_eq!(r, Some(PaymentMethod::PmNostrLightning));
         }
         {
             // payment method marker, 'ZAP:' nostr zap
             let r = guess_payment_method(&format!("ZAP:{}", NOSTR_ID1)).unwrap();
-            assert_eq!(r, PaymentMethod::PmNostrZap);
+            assert_eq!(r, Some(PaymentMethod::PmNostrZap));
         }
         {
             // legacy lightning address "LA:" marker
             let r = guess_payment_method("LA:zappool@blink_sv").unwrap();
-            assert_eq!(r, PaymentMethod::PmLnAddress);
+            assert_eq!(r, Some(PaymentMethod::PmLnAddress));
         }
     }
 
     #[test]
     fn test_determine_payment_method() {
+        let default_default_pm = PaymentMethod::PmNostrLightning;
         // Cases with No override
         {
-            let res = determine_payment_method(666, NOSTR_ID1).unwrap();
+            let res = determine_payment_method(666, NOSTR_ID1, default_default_pm).unwrap();
             assert_eq!(res, PaymentMethod::PmNostrLightning);
         }
         {
-            let res = determine_payment_method(666, "LA:zappool@blink_sv").unwrap();
+            let res = determine_payment_method(666, NOSTR_ID1, PaymentMethod::PmNostrZap).unwrap();
+            assert_eq!(res, PaymentMethod::PmNostrZap);
+        }
+        {
+            let res =
+                determine_payment_method(666, "LA:zappool@blink_sv", default_default_pm).unwrap();
             assert_eq!(res, PaymentMethod::PmLnAddress);
         }
         // Cases with With override from env
@@ -208,7 +226,8 @@ mod test {
             env::set_var("USER_METHOD_SETTING_OVERRIDE", "661:LNAD,662:NOLN");
         }
         {
-            let res = determine_payment_method(662, "LA:zappool@blink_sv").unwrap();
+            let res =
+                determine_payment_method(662, "LA:zappool@blink_sv", default_default_pm).unwrap();
             assert_eq!(res, PaymentMethod::PmNostrLightning);
         }
     }

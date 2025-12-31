@@ -12,6 +12,9 @@ PAYOUT_PERIOD_SECS=86400
 
 # PAYCALC_BIRTH_TIME=1758672000
 
+# Default payment method, "ZAP" or "NOLN"
+DEFAULT_PAYMENT_METHOD="NOLN"
+
 USER_METHOD_SETTING_OVERRIDE="661:LNAD,662:NOLN"
 
 # Encryption password for the nostr.nsec secret file
