@@ -25,9 +25,42 @@ Use your BitAxe to generate daily sats ready for zapping!
 
 ## Roadmap
 
-- 0.4 Payout as Zap
-- 0.4 Refactor: Payer service in Rust
 - User Dashboard with Nostr login
 - Beefed-up Dashboard
 - User Settings
+
+
+## Versions
+
+### v0.4 - Zap!: 20251231
+Important changes:
+- Payout as Nostr Zaps
+- Payer service rewritten in Rust (opensourced, moved to zappool-backend)
+- User-specific Dashboard
+- Backup
+- Switch to 8-blocks reward span (to be in sync with Ocean)
+- Workstat API protected by secret
+- Extend web, faq
+- Misc improvements
+
+### v0.3 - Beta:  20251017
+Important changes:
+- Web page, Dashboard
+- New environment
+- Beta version
+Features:
+- Proxy work (accept work, forward to mother pool), proxy rewards (receive reward, send out to users, bridge if needed). Users specify Nostr npub. Domain, website, basic dashboard, basic user dashboard. No config.
+- Components, database. No backup, dashboard, monitoring, redundancy.
+
+### v0.2 - Alpha:  20251006
+Important changes:
+- Miner ID is an npub now, payout is done to LN Address from Nostr profile
+- First alpha users
+Features:
+- Proxy work (accept work, forward to mother pool), proxy rewards (receive reward, send out to users, bridge if needed). Users specify Nostr npub. No domain, no website, no dashboard. No user dashboard. no config.
+- Components, database. No backup, dashboard, monitoring, redundancy.
+
+### v0.1 - Prototype1:  20250926
+- Proxy work (accept work, forward to mother pool), proxy rewards (receive reward, send out to users, bridge if needed). Users specify LN address. No domain, no website, no dashboard. No user dashboard. no config.
+- Components, database. No backup, dashboard, monitoring, redundancy.
 
