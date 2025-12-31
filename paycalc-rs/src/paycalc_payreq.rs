@@ -1,9 +1,11 @@
-use crate::payment_method::{adjusted_primary_id, determine_payment_method};
+use crate::payment_method::{
+    adjusted_primary_id, determine_payment_method, get_default_payment_method_from_env,
+};
 
 use common_rs::common_db::get_db_file;
 use common_rs::db_pc as db;
 use common_rs::dto_pc::{MinerSnapshot, PayRequest};
-use payer::common::shorten_id;
+use payer::common::{PaymentMethod, shorten_id};
 
 use dotenv;
 use rusqlite::{Connection, Transaction};
@@ -131,6 +133,7 @@ fn calculate_to_pay_for_miner(miner: &MinerSnapshot) -> Result<Option<u64>, Box<
 fn create_pay_request_if_needed(
     conn: &Transaction,
     miner: &mut MinerSnapshot,
+    default_payment_method: PaymentMethod,
 ) -> Result<(), Box<dyn Error>> {
     let to_pay = calculate_to_pay_for_miner(miner)?;
     if to_pay.is_none() || to_pay.unwrap_or(0) == 0 {
@@ -152,7 +155,8 @@ fn create_pay_request_if_needed(
     }
     //println!(primary_id);
 
-    let payment_method = determine_payment_method(miner.user_id, &primary_id)?;
+    let payment_method =
+        determine_payment_method(miner.user_id, &primary_id, default_payment_method)?;
     let adj_primary_id = adjusted_primary_id(payment_method, &primary_id)?;
     if adj_primary_id != primary_id {
         println!("Adjusted primary id: {}  ({})", adj_primary_id, primary_id);
@@ -271,7 +275,10 @@ fn update_miner_snapshots_nocommit(conn: &Transaction) -> Result<u32, Box<dyn Er
 // Update miner snapshots, including totals.
 // TODO: invoke only for changed items; but how?
 // Also computes amount scheduled for payment.
-fn update_miner_snapshots_and_create_payreqs(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+fn update_miner_snapshots_and_create_payreqs(
+    conn: &mut Connection,
+    default_payment_method: PaymentMethod,
+) -> Result<(), Box<dyn Error>> {
     let conntx = conn.transaction()?;
     let _ = update_miner_snapshots_nocommit(&conntx)?;
 
@@ -294,7 +301,7 @@ fn update_miner_snapshots_and_create_payreqs(conn: &mut Connection) -> Result<()
                 id, pr.id, pr.req_amnt
             );
         } else {
-            let _ = create_pay_request_if_needed(&conntx, ss)?;
+            let _ = create_pay_request_if_needed(&conntx, ss, default_payment_method)?;
         }
         cnt += 1;
     }
@@ -304,8 +311,11 @@ fn update_miner_snapshots_and_create_payreqs(conn: &mut Connection) -> Result<()
     Ok(())
 }
 
-fn iteration(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
-    let _ = update_miner_snapshots_and_create_payreqs(conn)?;
+fn iteration(
+    conn: &mut Connection,
+    default_payment_method: PaymentMethod,
+) -> Result<(), Box<dyn Error>> {
+    let _ = update_miner_snapshots_and_create_payreqs(conn, default_payment_method)?;
     let _ = print_miner_snapshots(conn)?;
     let _ = print_pay_requests(conn)?;
     Ok(())
@@ -321,7 +331,12 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
     let payout_period_secs = env::var("PAYOUT_PERIOD_SECS")
         .unwrap_or("86400".into())
         .parse::<u32>()?;
-    println!("Paycalc/Payreq: loop starting {payout_period_secs}");
+    let default_payment_method = get_default_payment_method_from_env()?;
+    println!(
+        "Paycalc/Payreq: loop starting, period {}, def pm {}",
+        payout_period_secs,
+        default_payment_method.to_string()
+    );
 
     loop {
         let now_utc = SystemTime::now()
@@ -356,7 +371,7 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
         }
 
         // Time!
-        match iteration(&mut conn) {
+        match iteration(&mut conn, default_payment_method) {
             Ok(_) => break,
             Err(e) => println!("ERROR in iteration, {e}"),
         }
