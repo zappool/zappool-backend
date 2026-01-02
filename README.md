@@ -32,6 +32,9 @@ Use your BitAxe to generate daily sats ready for zapping!
 
 ## Versions
 
+### v1.0 - Prod: 20260102
+The v0.4 with Zap support declared Prod version v1.0.
+
 ### v0.4 - Zap!: 20251231
 Important changes:
 - Payout as Nostr Zaps
