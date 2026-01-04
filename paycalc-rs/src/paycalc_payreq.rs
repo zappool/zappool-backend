@@ -21,7 +21,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 //
 
 /// The portion of earning considered for payout of the the only-estimated-not-committed amount
-const PAYOUT_RATIO_FOR_ESTIMATED: f64 = 0.80;
+const PAYOUT_RATIO_FOR_ESTIMATED: f64 = 0.67;
 
 fn print_miner_snapshot(ss: &MinerSnapshot) {
     println!(
@@ -391,7 +391,7 @@ mod tests {
 
         let (unpaid, unpaid_cons) = result.unwrap();
         assert_eq!(unpaid, 1300);
-        assert_eq!(unpaid_cons, 1200);
+        assert_eq!(unpaid_cons, 1135);
     }
 
     #[test]
@@ -412,7 +412,7 @@ mod tests {
 
         let (unpaid, unpaid_cons) = result.unwrap();
         assert_eq!(unpaid, 200);
-        assert_eq!(unpaid_cons, 100);
+        assert_eq!(unpaid_cons, 35);
     }
 
     #[test]
@@ -422,6 +422,6 @@ mod tests {
 
         let (unpaid, unpaid_cons) = result.unwrap();
         assert_eq!(unpaid, -1500);
-        assert_eq!(unpaid_cons, -1600);
+        assert_eq!(unpaid_cons, -1665);
     }
 }
