@@ -5,8 +5,8 @@
 repo_name="datum_gateway"
 src_dir="./"$repo_name
 repo_path="https://github.com/OCEAN-xyz/"$repo_name
-tag="v0.4.0beta"
-patch_file="../hooks-v040.bcf7547.patch"
+tag="v0.4.1beta"
+patch_file="../gateway-hooked_v041_705a297.patch"
 
 if [ ! -d "$src_dir" ]; then
     echo "Cloning the $repo_name git repository..."
