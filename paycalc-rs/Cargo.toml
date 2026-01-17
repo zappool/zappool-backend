@@ -25,3 +25,7 @@ path = "src/main_dashboard/main.rs"
 [[bin]]
 name = "main_list_work"
 path = "src/main_list_work/main.rs"
+
+[[bin]]
+name = "main_stats"
+path = "src/main_stats/main.rs"
