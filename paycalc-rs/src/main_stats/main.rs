@@ -110,6 +110,45 @@ async fn count_users_with_zaps(
     Ok(())
 }
 
+async fn list_stale_users_unpaid_amounts(
+    conn: &Connection,
+    now: u64,
+) -> Result<(), Box<dyn Error>> {
+    println!("\nList stale users and unpaid amounts ...");
+
+    let min_unpaid = 5000;
+    // TODO Use CommitLastTime instead of Time; more accurate
+    let mut stmt = conn.prepare(
+        "SELECT MINER_SS.UserS as User, MINER_SS.Time as Time, MINER_SS.UnpaidCons as Unpaid \
+            FROM MINER_SS \
+            WHERE MINER_SS.UnpaidCons >= ?1 \
+            ",
+    )?;
+
+    let res = stmt
+        .query_map((min_unpaid,), |row| {
+            let user = row.get::<_, String>(0)?;
+            let time = row.get::<_, u64>(1)?;
+            let unpaid = row.get::<_, u64>(2)?;
+            Ok((user, time, unpaid))
+        })?
+        .filter(|res| res.is_ok())
+        .map(|res| res.unwrap())
+        .collect::<Vec<(String, u64, u64)>>();
+    // println!("len {}", res.len());
+    println!("  {}  {}  {}", "age (h)", "unpaid", "user");
+    for r in &res {
+        let user = &r.0;
+        let time = r.1;
+        let age = (now - time) as f64 / 3600.0;
+        let unpaid = r.2 as f64 / 1000.0;
+        println!("  {:.2} h  {:.1}  {}", age, unpaid, user);
+    }
+    println!("{} entries", res.len());
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // paycalc_rs::ln_address::do_try().await;
@@ -126,6 +165,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let days = 5;
     let _ = count_users_with_zaps(&conn, now_utc - days * 86400 - 2 * 3600, now_utc, 3).await?;
+
+    let _ = list_stale_users_unpaid_amounts(&conn, now_utc).await?;
 
     Ok(())
 }
