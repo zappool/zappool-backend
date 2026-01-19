@@ -1,4 +1,4 @@
-use crate::common_db::get_db_update_versions_from_args;
+use crate::common_db::{ensure_db_version, get_db_update_versions_from_args, set_current_db_version};
 use crate::dto_pc::{Block, MinerSnapshot, PayRequest, Payment, Work};
 
 use rusqlite::{Connection, Params, Row, Transaction};
@@ -25,6 +25,9 @@ fn db_setup_from_to(
 
     if vfrom <= 0 && vto >= 3 {
         db_update_0_3(conn)?;
+    }
+    if vfrom <= 3 && vto >= 4 {
+        db_update_3_4(conn)?;
     }
 
     Ok(())
@@ -206,6 +209,24 @@ fn db_update_0_3(conn: &Connection) -> Result<(), Box<dyn Error>> {
     let _ = conn.execute("CREATE INDEX PaymentId ON PAYMENT (Id)", [])?;
     let _ = conn.execute("CREATE INDEX PaymentReqId ON PAYMENT (ReqId)", [])?;
     let _ = conn.execute("CREATE INDEX PaymentStatusTime ON PAYMENT (StatusTime)", [])?;
+
+    // Note: auto commit
+
+    Ok(())
+}
+
+fn db_update_3_4(conn: &Connection) -> Result<(), Box<dyn Error>> {
+    let _ = ensure_db_version(conn, 3)?;
+
+    // CommitLastTime: Time of (currently) last time when committed was updated (due to new worktiem or block)
+    let _ = conn.execute(
+        "ALTER TABLE MINER_SS ADD CommitLastTime INTEGER", []
+    )?;
+    let _ = conn.execute(
+        "UPDATE MINER_SS SET CommitLastTime = Time", []
+    )?;
+
+    let _ = set_current_db_version(conn, 4)?;
 
     // Note: auto commit
 
@@ -426,24 +447,22 @@ pub fn work_get_total_estimated(conn: &Connection) -> Result<u64, Box<dyn Error>
     Ok(sum)
 }
 
-pub fn work_get_user_total_committed(
+// Return total_committed, total_estimated, last_time for user
+pub fn work_get_user_totals(
     conn: &Connection,
     user_o_id: u32,
-) -> Result<u64, Box<dyn Error>> {
-    let mut stmt = conn.prepare("SELECT SUM(Committed) FROM WORK WHERE UNameO == ?1;")?;
-    let sum = stmt.query_one((user_o_id,), |row| Ok(row.get::<_, u64>(0).unwrap_or(0)))?;
+) -> Result<(u64, u64, u32), Box<dyn Error>> {
+    let mut stmt = conn.prepare(
+        "SELECT SUM(Committed) AS TotCommitted, SUM(Estimate) AS TotEstimate, MAX(CommitTime) AS LastTime \
+        FROM WORK WHERE UNameO == ?1;"
+    )?;
+    let totals = stmt.query_one((user_o_id,), |row| Ok((
+        row.get::<_, u64>(0).unwrap_or(0),
+        row.get::<_, u64>(1).unwrap_or(0),
+        row.get::<_, u32>(2).unwrap_or(0),
+    )))?;
     // println!("sum {:?}", sum);
-    Ok(sum)
-}
-
-pub fn work_get_user_total_estimated(
-    conn: &Connection,
-    user_o_id: u32,
-) -> Result<u64, Box<dyn Error>> {
-    let mut stmt = conn.prepare("SELECT SUM(Estimate) FROM WORK WHERE UNameO == ?1")?;
-    let sum = stmt.query_one((user_o_id,), |row| Ok(row.get::<_, u64>(0).unwrap_or(0)))?;
-    // println!("{}", sum);
-    Ok(sum)
+    Ok(totals)
 }
 
 pub fn work_update_nocommit(conntx: &Transaction, w: &Work) -> Result<(), Box<dyn Error>> {
@@ -869,7 +888,7 @@ pub fn miner_ss_insert_nocommit(
 
 pub fn miner_ss_get_all(conn: &Connection) -> Result<Vec<MinerSnapshot>, Box<dyn Error>> {
     let mut stmt = conn.prepare(
-        "SELECT UserId, UserS, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId \
+        "SELECT UserId, UserS, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId, CommitLastTime \
         FROM MINER_SS \
         ORDER BY UserId ASC",
     )?;
@@ -885,6 +904,7 @@ pub fn miner_ss_get_all(conn: &Connection) -> Result<Vec<MinerSnapshot>, Box<dyn
                 row.get::<_, i64>(6)?,
                 row.get::<_, i64>(7)?,
                 row.get::<_, i32>(8)?,
+                row.get::<_, u32>(9)?,
             ))
         })?
         .filter(|res| res.is_ok())
