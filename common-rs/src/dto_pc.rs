@@ -168,6 +168,8 @@ pub struct MinerSnapshot {
     // Diff between conservative estimate (committed + most estimate) and paid, may be negative; Msat
     pub unpaid_cons: i64,
     pub payreq_id: i32,
+    // CommitLastTime: Time of (currently) last time when committed was updated (due to new worktiem or block)
+    pub commit_last_time: u32,
 }
 
 impl MinerSnapshot {
@@ -181,6 +183,7 @@ impl MinerSnapshot {
         unpaid: i64,
         unpaid_cons: i64,
         payreq_id: i32,
+        commit_last_time: u32,
     ) -> Self {
         Self {
             user_id,
@@ -192,6 +195,7 @@ impl MinerSnapshot {
             unpaid,
             unpaid_cons,
             payreq_id,
+            commit_last_time,
         }
     }
 }

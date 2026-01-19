@@ -533,7 +533,7 @@ fn create_new_miner_record_if_needed(conn: &Connection, id: u32) -> Result<(), B
         .unwrap_or_default()
         .as_secs() as u32;
     let user_s = db::userlookup_get_string(conn, id)?;
-    let miner_ss = MinerSnapshot::new(id, user_s, now_utc, 0, 0, 0, 0, 0, -1);
+    let miner_ss = MinerSnapshot::new(id, user_s, now_utc, 0, 0, 0, 0, 0, -1, now_utc);
     let _ = db::miner_ss_insert_nocommit(conn, &miner_ss)?;
     Ok(())
 }

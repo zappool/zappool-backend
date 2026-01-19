@@ -195,13 +195,19 @@ fn compute_unpaid_values(
 fn compute_miner_snapshot_values(
     conn: &Connection,
     user_id: u32,
-) -> Result<(u64, u64, u64, i64, i64), Box<dyn Error>> {
-    let tot_committed = db::work_get_user_total_committed(conn, user_id)?;
-    let tot_estimated = db::work_get_user_total_estimated(conn, user_id)?;
+) -> Result<(u64, u64, u64, i64, i64, u32), Box<dyn Error>> {
+    let (tot_committed, tot_estimated, last_time) = db::work_get_user_totals(conn, user_id)?;
     let tot_paid = db::payment_get_total_paid_to_miner(conn, user_id)?;
     // println!("tot_paid {tot_paid} (id {id})");
     let (unpaid, unpaid_cons) = compute_unpaid_values(tot_committed, tot_estimated, tot_paid)?;
-    Ok((tot_committed, tot_estimated, tot_paid, unpaid, unpaid_cons))
+    Ok((
+        tot_committed,
+        tot_estimated,
+        tot_paid,
+        unpaid,
+        unpaid_cons,
+        last_time,
+    ))
 }
 
 // Update miner snapshot values (totals)
@@ -214,13 +220,14 @@ fn update_miner_snapshot(
         .unwrap_or_default()
         .as_secs() as u32;
 
-    let (tot_committed, tot_estimated, tot_paid, unpaid, unpaid_cons) =
+    let (tot_committed, tot_estimated, tot_paid, unpaid, unpaid_cons, commit_last_time) =
         compute_miner_snapshot_values(conn, ss.user_id)?;
     if tot_committed == ss.tot_commit
         && tot_estimated == ss.tot_estimate
         && tot_paid == ss.tot_paid
         && unpaid == ss.unpaid
         && unpaid_cons == ss.unpaid_cons
+        && commit_last_time == ss.commit_last_time
     {
         // No change
         return Ok(false);
@@ -233,6 +240,7 @@ fn update_miner_snapshot(
     ss.unpaid = unpaid;
     ss.unpaid_cons = unpaid_cons;
     ss.time = now_utc;
+    ss.commit_last_time = commit_last_time;
 
     Ok(true)
 }

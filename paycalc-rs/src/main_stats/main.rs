@@ -119,7 +119,7 @@ async fn list_stale_users_unpaid_amounts(
     let min_unpaid = 5000;
     // TODO Use CommitLastTime instead of Time; more accurate
     let mut stmt = conn.prepare(
-        "SELECT MINER_SS.UserS as User, MINER_SS.Time as Time, MINER_SS.UnpaidCons as Unpaid \
+        "SELECT MINER_SS.UserS as User, MINER_SS.CommitLastTime as LastTime, MINER_SS.UnpaidCons as Unpaid \
             FROM MINER_SS \
             WHERE MINER_SS.UnpaidCons >= ?1 \
             ",
@@ -136,11 +136,11 @@ async fn list_stale_users_unpaid_amounts(
         .map(|res| res.unwrap())
         .collect::<Vec<(String, u64, u64)>>();
     // println!("len {}", res.len());
-    println!("  {}  {}  {}", "age (h)", "unpaid", "user");
+    println!("  age (hr)  unpaid (sat)  user");
     for r in &res {
         let user = &r.0;
-        let time = r.1;
-        let age = (now - time) as f64 / 3600.0;
+        let last_time = r.1;
+        let age = (now - last_time) as f64 / 3600.0;
         let unpaid = r.2 as f64 / 1000.0;
         println!("  {:.2} h  {:.1}  {}", age, unpaid, user);
     }
