@@ -5,7 +5,7 @@ use rusqlite::{Connection, Params, Row, Transaction};
 use std::error::Error;
 
 static BLOCKS_WINDOW: u8 = 8;
-pub static LATEST_DB_VERSION: u8 = 3;
+pub static LATEST_DB_VERSION: u8 = 4;
 
 // Upgrade from an older version, versions taken from args
 pub fn db_setup(conn: &Connection) -> Result<(), Box<dyn Error>> {
@@ -453,7 +453,7 @@ pub fn work_get_user_totals(
     user_o_id: u32,
 ) -> Result<(u64, u64, u32), Box<dyn Error>> {
     let mut stmt = conn.prepare(
-        "SELECT SUM(Committed) AS TotCommitted, SUM(Estimate) AS TotEstimate, MAX(CommitTime) AS LastTime \
+        "SELECT SUM(Committed) AS TotCommitted, SUM(Estimate) AS TotEstimate, MAX(CommitNextTime) AS LastTime \
         FROM WORK WHERE UNameO == ?1;"
     )?;
     let totals = stmt.query_one((user_o_id,), |row| Ok((
