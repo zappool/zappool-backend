@@ -131,13 +131,12 @@ fn calculate_to_pay_for_miner(miner: &MinerSnapshot) -> Result<Option<u64>, Box<
 }
 
 fn create_pay_request_if_needed(
-    conn: &Transaction,
     miner: &mut MinerSnapshot,
     default_payment_method: PaymentMethod,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Option<PayRequest>, Box<dyn Error>> {
     let to_pay = calculate_to_pay_for_miner(miner)?;
     if to_pay.is_none() || to_pay.unwrap_or(0) == 0 {
-        return Ok(());
+        return Ok(None);
     }
     let to_pay = to_pay.unwrap();
 
@@ -170,13 +169,25 @@ fn create_pay_request_if_needed(
         adj_primary_id,
         miner.time,
     );
-    let pr_id = db::payreq_insert_nocommit(conn, &pr)?;
-    miner.payreq_id = pr_id as i32;
-    println!(
-        "Payment request created, ID {}, user {}",
-        miner.payreq_id, miner.user_s
-    );
-    Ok(())
+    Ok(Some(pr))
+}
+
+fn create_and_save_pay_request_if_needed(
+    conn: &Transaction,
+    miner: &mut MinerSnapshot,
+    default_payment_method: PaymentMethod,
+) -> Result<(), Box<dyn Error>> {
+    if let Some(pr) = create_pay_request_if_needed(miner, default_payment_method)? {
+        let pr_id = db::payreq_insert_nocommit(conn, &pr)?;
+        miner.payreq_id = pr_id as i32;
+        println!(
+            "Payment request created, ID {}, user {}",
+            miner.payreq_id, miner.user_s
+        );
+        Ok(())
+    } else {
+        Ok(())
+    }
 }
 
 // Compute updated committed/estimated/etc values for a miner snapshot
@@ -309,7 +320,7 @@ fn update_miner_snapshots_and_create_payreqs(
                 id, pr.id, pr.req_amnt
             );
         } else {
-            let _ = create_pay_request_if_needed(&conntx, ss, default_payment_method)?;
+            let _ = create_and_save_pay_request_if_needed(&conntx, ss, default_payment_method)?;
         }
         cnt += 1;
     }
