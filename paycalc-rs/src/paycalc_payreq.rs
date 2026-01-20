@@ -24,7 +24,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 const PAYOUT_RATIO_FOR_ESTIMATED: f64 = 0.67;
 
 fn print_miner_snapshot(ss: &MinerSnapshot) {
-    println!(
+    print!(
         "  {}:{} \t {} \t {} \t {} \t {} \t {} \t {}",
         ss.user_id,
         shorten_id(&ss.user_s),
@@ -43,12 +43,18 @@ pub fn print_miner_snapshots(conn: &Connection) -> Result<(), Box<dyn Error>> {
     println!("Snapshots: ({})", snapshots.len());
     println!("  miner \t committed \t estimated \t paid \t unpaid \t unpaid_cons \t payreqid");
     for ss in &snapshots {
-        print_miner_snapshot(ss);
+        let _ = print_miner_snapshot(ss);
+        println!("");
     }
     Ok(())
 }
 
 pub fn print_updated_miner_snapshots(conn: &Connection) -> Result<(), Box<dyn Error>> {
+    let now_utc = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as u32;
+
     let snapshots = db::miner_ss_get_all(conn)?;
     println!("");
     println!("Updated snapshots: ({})", snapshots.len());
@@ -56,12 +62,26 @@ pub fn print_updated_miner_snapshots(conn: &Connection) -> Result<(), Box<dyn Er
     for ss in &snapshots {
         let mut ss_copy = ss.clone();
         let changed = update_miner_snapshot(conn, &mut ss_copy)?;
-        if changed {
-            print!("*");
+        // See if this would create a payrequest now
+        let (topay_now_opt, _reject_reason) =
+            calculate_to_pay_for_miner(&mut ss_copy, now_utc).unwrap();
+        if topay_now_opt.is_some() {
+            print!("!"); // should be paid
         } else {
-            print!(" ");
+            if changed {
+                print!("*"); // snapshot updated
+            } else {
+                print!(" "); // snapshot not updated
+            }
         }
         let _ = print_miner_snapshot(&ss_copy);
+        // Print amount to be paid now
+        if let Some(topay_now) = topay_now_opt {
+            print!("  P {}", topay_now);
+        } else {
+            print!("  -");
+        }
+        println!("");
     }
     Ok(())
 }
@@ -115,27 +135,71 @@ fn get_payout_threshold() -> Result<(u64, u64, u32), Box<dyn Error>> {
     Ok((threshold, maximum, granularity))
 }
 
-fn calculate_to_pay_for_miner(miner: &MinerSnapshot) -> Result<Option<u64>, Box<dyn Error>> {
+// Return to-pay amount (if to be paid now) and reject reason (it not)
+fn calculate_to_pay_for_miner(
+    miner: &MinerSnapshot,
+    now: u32,
+) -> Result<(Option<u64>, Option<String>), Box<dyn Error>> {
     let (threshold, maximum, granularity) = get_payout_threshold()?;
+
+    // Amount too low, don't pay now
     if miner.unpaid_cons < threshold as i64 {
-        // too little, ignore for now
-        return Ok(None);
+        return Ok((
+            None,
+            Some(format!(
+                "Amount too low to be paid {} {}",
+                miner.unpaid_cons, threshold
+            )),
+        ));
     }
     assert!(miner.unpaid_cons > 0);
+
+    // Stale account: If a user account has seen its last commitment update more than X (10) days ago,
+    // don't try to pay out. In this case the account was not actively mining for at least 10
+    // (but likely more due to the 12 blocks commitment delay), and its pending payment could not be paid out
+    // for 10 days. If the account becomes active, it will be tried again automatically.
+    // If the account remains stale (and payout failed multiple times), it can only be attempted to be paid out
+    // by contacting the user.
+    let stale_acc_age_limit_days = 10.0;
+    let stale_acc_age_limit = (stale_acc_age_limit_days * 86400.0) as u32;
+    let age = now - miner.commit_last_time;
+    if age > stale_acc_age_limit {
+        return Ok((
+            None,
+            Some(format!(
+                "Account is stale  age {} {} {}  amnt {}  user {} {}",
+                age,
+                stale_acc_age_limit,
+                stale_acc_age_limit_days,
+                miner.unpaid_cons,
+                miner.user_id,
+                miner.user_s
+            )),
+        ));
+    }
+
     let unpaid_cons = miner.unpaid_cons as u64; // it is non-negative by now
     // Clap to min, max
     let mut to_pay = std::cmp::min(std::cmp::max(unpaid_cons, threshold), maximum);
     // Round to granularity (typically sat)
     to_pay = granularity as u64 * ((to_pay as f64) / (granularity as f64)).round() as u64;
-    Ok(Some(to_pay))
+    Ok((Some(to_pay), None))
 }
 
 fn create_pay_request_if_needed(
     miner: &mut MinerSnapshot,
     default_payment_method: PaymentMethod,
+    now: u32,
 ) -> Result<Option<PayRequest>, Box<dyn Error>> {
-    let to_pay = calculate_to_pay_for_miner(miner)?;
-    if to_pay.is_none() || to_pay.unwrap_or(0) == 0 {
+    let (to_pay, reject_reason) = calculate_to_pay_for_miner(miner, now)?;
+
+    if to_pay.is_none() {
+        if let Some(reason) = reject_reason {
+            println!("No pay request now: {}", reason);
+        }
+        return Ok(None);
+    }
+    if to_pay.unwrap_or(0) == 0 {
         return Ok(None);
     }
     let to_pay = to_pay.unwrap();
@@ -176,8 +240,9 @@ fn create_and_save_pay_request_if_needed(
     conn: &Transaction,
     miner: &mut MinerSnapshot,
     default_payment_method: PaymentMethod,
+    now: u32,
 ) -> Result<(), Box<dyn Error>> {
-    if let Some(pr) = create_pay_request_if_needed(miner, default_payment_method)? {
+    if let Some(pr) = create_pay_request_if_needed(miner, default_payment_method, now)? {
         let pr_id = db::payreq_insert_nocommit(conn, &pr)?;
         miner.payreq_id = pr_id as i32;
         println!(
@@ -286,6 +351,7 @@ fn update_miner_snapshots_nocommit(conn: &Transaction) -> Result<u32, Box<dyn Er
             let _ = db::miner_ss_insert_nocommit(conn, &ss_copy)?;
             cnt += 1;
             let _ = print_miner_snapshot(&ss_copy);
+            println!("");
         }
     }
     Ok(cnt)
@@ -298,6 +364,11 @@ fn update_miner_snapshots_and_create_payreqs(
     conn: &mut Connection,
     default_payment_method: PaymentMethod,
 ) -> Result<(), Box<dyn Error>> {
+    let now_utc = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as u32;
+
     let conntx = conn.transaction()?;
     let _ = update_miner_snapshots_nocommit(&conntx)?;
 
@@ -320,7 +391,12 @@ fn update_miner_snapshots_and_create_payreqs(
                 id, pr.id, pr.req_amnt
             );
         } else {
-            let _ = create_and_save_pay_request_if_needed(&conntx, ss, default_payment_method)?;
+            let _ = create_and_save_pay_request_if_needed(
+                &conntx,
+                ss,
+                default_payment_method,
+                now_utc,
+            )?;
         }
         cnt += 1;
     }
@@ -464,7 +540,8 @@ mod tests {
             7,
             now_utc,
         );
-        let result = create_pay_request_if_needed(&mut miner, PaymentMethod::PmNostrZap).unwrap();
+        let result =
+            create_pay_request_if_needed(&mut miner, PaymentMethod::PmNostrZap, now_utc).unwrap();
         assert_eq!(result.unwrap().req_amnt, 10_000);
 
         // Below the threshold limit (5000 by default)
@@ -480,7 +557,25 @@ mod tests {
             7,
             now_utc,
         );
-        let result = create_pay_request_if_needed(&mut miner, PaymentMethod::PmNostrZap).unwrap();
+        let result =
+            create_pay_request_if_needed(&mut miner, PaymentMethod::PmNostrZap, now_utc).unwrap();
+        assert!(result.is_none());
+
+        // Stale (very old) with enough to pay --> ignore
+        let mut miner = MinerSnapshot::new(
+            1,
+            "test_user".to_string(),
+            now_utc - 30 * 86400,
+            100_000,
+            105_000,
+            93_000,
+            12_000,
+            10_000,
+            7,
+            now_utc - 25 * 86400,
+        );
+        let result =
+            create_pay_request_if_needed(&mut miner, PaymentMethod::PmNostrZap, now_utc).unwrap();
         assert!(result.is_none());
     }
 }
