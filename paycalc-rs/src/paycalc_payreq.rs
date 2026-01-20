@@ -443,4 +443,44 @@ mod tests {
         assert_eq!(unpaid, -1500);
         assert_eq!(unpaid_cons, -1665);
     }
+
+    #[test]
+    fn test_create_pay_request_if_needed() {
+        let now_utc = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as u32;
+
+        // Enough to pay
+        let mut miner = MinerSnapshot::new(
+            1,
+            "test_user".to_string(),
+            now_utc - 86400,
+            100_000,
+            105_000,
+            93_000,
+            12_000,
+            10_000,
+            7,
+            now_utc,
+        );
+        let result = create_pay_request_if_needed(&mut miner, PaymentMethod::PmNostrZap).unwrap();
+        assert_eq!(result.unwrap().req_amnt, 10_000);
+
+        // Below the threshold limit (5000 by default)
+        let mut miner = MinerSnapshot::new(
+            1,
+            "test_user".to_string(),
+            now_utc - 86400,
+            100_000,
+            102_000,
+            98_000,
+            4_000,
+            3_000,
+            7,
+            now_utc,
+        );
+        let result = create_pay_request_if_needed(&mut miner, PaymentMethod::PmNostrZap).unwrap();
+        assert!(result.is_none());
+    }
 }
