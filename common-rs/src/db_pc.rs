@@ -841,8 +841,8 @@ pub fn miner_ss_insert_nocommit(
     // History: simply insert
     let _ = conn.execute(
         "INSERT INTO MINER_SS_HIST \
-        (UserId, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId) \
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        (UserId, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId, CommitLastTime) \
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         (
             ss.user_id,
             ss.time,
@@ -852,15 +852,16 @@ pub fn miner_ss_insert_nocommit(
             ss.unpaid,
             ss.unpaid_cons,
             ss.payreq_id,
+            ss.commit_last_time,
         ),
     )?;
 
     // Update-or-add.
     let _ = conn.execute(
         "UPDATE MINER_SS \
-        SET Time = ?1, TotCommit = ?2, TotEstimate = ?3, TotPaid = ?4, Unpaid = ?5, UnpaidCons = ?6, PayReqId = ?7
-        WHERE UserId = ?8",
-        (ss.time, ss.tot_commit, ss.tot_estimate, ss.tot_paid, ss.unpaid, ss.unpaid_cons, ss.payreq_id, ss.user_id,))?;
+        SET Time = ?1, TotCommit = ?2, TotEstimate = ?3, TotPaid = ?4, Unpaid = ?5, UnpaidCons = ?6, PayReqId = ?7, CommitLastTime = ?8
+        WHERE UserId = ?9",
+        (ss.time, ss.tot_commit, ss.tot_estimate, ss.tot_paid, ss.unpaid, ss.unpaid_cons, ss.payreq_id, ss.commit_last_time, ss.user_id,))?;
 
     let mut stmt = conn.prepare("SELECT UserId FROM MINER_SS WHERE UserId = ?1")?;
     let mut id = stmt.query((ss.user_id,))?;
@@ -868,8 +869,8 @@ pub fn miner_ss_insert_nocommit(
         // Not present
         let _ = conn.execute(
             "INSERT INTO MINER_SS \
-            (UserId, UserS, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId) \
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            (UserId, UserS, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId, CommitLastTime) \
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             (
                 ss.user_id,
                 &ss.user_s,
@@ -880,6 +881,7 @@ pub fn miner_ss_insert_nocommit(
                 ss.unpaid,
                 ss.unpaid_cons,
                 ss.payreq_id,
+                ss.commit_last_time,
             ),
         )?;
     }
