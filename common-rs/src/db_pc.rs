@@ -841,8 +841,8 @@ pub fn miner_ss_insert_nocommit(
     // History: simply insert
     let _ = conn.execute(
         "INSERT INTO MINER_SS_HIST \
-        (UserId, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId, CommitLastTime) \
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        (UserId, Time, TotCommit, TotEstimate, TotPaid, Unpaid, UnpaidCons, PayReqId) \
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         (
             ss.user_id,
             ss.time,
@@ -852,7 +852,6 @@ pub fn miner_ss_insert_nocommit(
             ss.unpaid,
             ss.unpaid_cons,
             ss.payreq_id,
-            ss.commit_last_time,
         ),
     )?;
 
