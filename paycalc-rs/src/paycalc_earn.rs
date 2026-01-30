@@ -442,6 +442,7 @@ fn update_given_work_estimates(
         .as_secs() as u32;
     let mut updated_work = Vec::new();
     let mut new_estimate;
+    let mut idx: i64 = 0;
     for w in work {
         if w.commit_blocks >= BLOCKS_WINDOW {
             new_estimate = 0;
@@ -453,18 +454,23 @@ fn update_given_work_estimates(
             //println!("  estimate {rem_blocks} {new_estimate} {w.estimate} {w.committed}");
         }
         if new_estimate != w.estimate {
-            println!(
-                "  new estimate:  {}  vs.  {}  {} {}  addage {}",
-                new_estimate,
-                w.estimate,
-                w.commit_blocks,
-                w.committed,
-                now_utc as i32 - (w.time_add).round() as i32
-            );
+            // Print, but limit (to avoid log flood)
+            if (idx <= 5) || (idx >= work.len() as i64 - 5) {
+                println!(
+                    "  new estimate {}:  {}  vs.  {}  {} {}  addage {}",
+                    idx,
+                    new_estimate,
+                    w.estimate,
+                    w.commit_blocks,
+                    w.committed,
+                    now_utc as i32 - (w.time_add).round() as i32
+                );
+            }
             let mut wcopy = w.clone();
             wcopy.estimate = new_estimate;
             updated_work.push(wcopy);
         }
+        idx += 1;
     }
     println!(
         "update_given_work_estimates:  found {}/{} estimates to be updated",
