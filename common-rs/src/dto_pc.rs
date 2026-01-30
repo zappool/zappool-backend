@@ -168,7 +168,7 @@ pub struct MinerSnapshot {
     // Diff between conservative estimate (committed + most estimate) and paid, may be negative; Msat
     pub unpaid_cons: i64,
     pub payreq_id: i32,
-    // CommitLastTime: Time of (currently) last time when committed was updated (due to new worktiem or block)
+    // Time of (currently) last time when committed was updated (due to new block or worktiem)
     pub commit_last_time: u32,
 }
 
