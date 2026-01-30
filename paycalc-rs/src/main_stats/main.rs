@@ -117,7 +117,7 @@ async fn list_stale_users_unpaid_amounts(
     println!("\nList stale users and unpaid amounts ...");
 
     let min_unpaid = 5000;
-    // TODO Use CommitLastTime instead of Time; more accurate
+    // Use CommitLastTime instead of Time; more accurate
     let mut stmt = conn.prepare(
         "SELECT MINER_SS.UserS as User, MINER_SS.CommitLastTime as LastTime, MINER_SS.UnpaidCons as Unpaid \
             FROM MINER_SS \

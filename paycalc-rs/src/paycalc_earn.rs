@@ -646,10 +646,10 @@ fn iteration(
             tot_blocks_earned,
             tot_work_comm_pre,
             tot_work_comm_post,
-            tot_work_comm_post - tot_work_comm_pre,
+            tot_work_comm_post as i64 - tot_work_comm_pre as i64,
             tot_work_estim_pre,
             tot_work_estim_post,
-            tot_work_estim_post - tot_work_estim_pre
+            tot_work_estim_post as i64 - tot_work_estim_pre as i64
         );
     }
 
