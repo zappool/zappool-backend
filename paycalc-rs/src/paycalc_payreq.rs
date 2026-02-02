@@ -163,7 +163,7 @@ fn calculate_to_pay_for_miner(
     let stale_acc_age_limit_days = 10.0;
     let stale_acc_age_limit = (stale_acc_age_limit_days * 86400.0) as u32;
     let age = now - miner.commit_last_time;
-    if age > stale_acc_age_limit {
+    if miner.commit_last_time != 0 && age > stale_acc_age_limit {
         return Ok((
             None,
             Some(format!(
@@ -273,8 +273,9 @@ fn compute_miner_snapshot_values(
     user_id: u32,
 ) -> Result<(u64, u64, u64, i64, i64, u32), Box<dyn Error>> {
     let (tot_committed, tot_estimated, last_time) = db::work_get_user_totals(conn, user_id)?;
+    // println!("tot_committed {}  tot_estimated {}  last_time {}", tot_committed, tot_estimated, last_time);
     let tot_paid = db::payment_get_total_paid_to_miner(conn, user_id)?;
-    // println!("tot_paid {tot_paid} (id {id})");
+    // println!("tot_paid {tot_paid} (id {user_id})");
     let (unpaid, unpaid_cons) = compute_unpaid_values(tot_committed, tot_estimated, tot_paid)?;
     Ok((
         tot_committed,
