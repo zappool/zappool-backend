@@ -370,8 +370,14 @@ fn update_miner_snapshots_and_create_payreqs(
         .unwrap_or_default()
         .as_secs() as u32;
 
+    println!("update_miner_snapshots_and_create_payreqs: Update snapshots ...");
     let conntx = conn.transaction()?;
+
     let _ = update_miner_snapshots_nocommit(&conntx)?;
+    let _ = conntx.commit()?;
+
+    let conntx = conn.transaction()?;
+    println!("update_miner_snapshots_and_create_payreqs: Snapshots updated.");
 
     // Record open pay requests, not to create new request for the same miners
     let open_pay_requests = db::payreq_get_all_non_final(&conntx)?;
@@ -403,7 +409,7 @@ fn update_miner_snapshots_and_create_payreqs(
     }
 
     let _ = conntx.commit()?;
-    println!("Updated miner snapshots, cnt {cnt}");
+    println!("update_miner_snapshots_and_create_payreqs: Updated miner snapshots (cnt {cnt}), created pay requests");
     Ok(())
 }
 
@@ -411,7 +417,9 @@ fn iteration(
     conn: &mut Connection,
     default_payment_method: PaymentMethod,
 ) -> Result<(), Box<dyn Error>> {
+    println!("paycalc_payreq iteration: create ...");
     let _ = update_miner_snapshots_and_create_payreqs(conn, default_payment_method)?;
+    println!("paycalc_payreq iteration: create done, print");
     let _ = print_miner_snapshots(conn)?;
     let _ = print_pay_requests(conn)?;
     Ok(())
@@ -456,7 +464,10 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
                 break;
             }
             let diff = next_new_time - now_utc;
-            let to_wait = f64::max((0.90 * (diff as f64)).floor() + 0.05, 0.1);
+            let to_wait = f64::max(
+                f64::min(0.90 * (diff as f64), (2 * 3600) as f64).floor() + 0.05,
+                0.1,
+            );
             if to_wait >= 2.0 {
                 println!(
                     "Sleeping for {:.1} secs... (next_time {:.1} {})",
@@ -467,7 +478,10 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
         }
 
         // Time!
-        match iteration(&mut conn, default_payment_method) {
+        println!("paycalc_payreq loop_iteration: Start iteration ...");
+        let res = iteration(&mut conn, default_payment_method);
+        println!("paycalc_payreq loop_iteration: iteration done ({:?})", res);
+        match res {
             Ok(_) => break,
             Err(e) => println!("ERROR in iteration, {e}"),
         }
