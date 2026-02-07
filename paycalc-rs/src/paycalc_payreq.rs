@@ -455,7 +455,7 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
             "Next payreq check time in {:.1} secs ({})",
             diff, next_new_time
         );
-        loop {
+        loop { // wait
             let now_utc = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
@@ -481,12 +481,11 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
         println!("paycalc_payreq loop_iteration: Start iteration ...");
         let res = iteration(&mut conn, default_payment_method);
         println!("paycalc_payreq loop_iteration: iteration done ({:?})", res);
-        match res {
-            Ok(_) => break,
-            Err(e) => println!("ERROR in iteration, {e}"),
+        if let Err(e) = res {
+            println!("ERROR in iteration, {e}");
         }
     }
-    Ok(())
+    // Ok(())
 }
 
 #[cfg(test)]
