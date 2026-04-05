@@ -1,4 +1,4 @@
-use workstat_rs::db_ws;
+use common_rs::db_ws;
 
 use axum::{
     Json,

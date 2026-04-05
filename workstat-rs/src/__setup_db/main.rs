@@ -1,4 +1,4 @@
-use workstat_rs::db_ws::db_setup_1;
+use common_rs::db_ws::db_setup_1;
 
 use common_rs::common_db::get_db_file;
 use rusqlite::Connection;

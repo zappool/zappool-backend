@@ -1,4 +1,4 @@
-use workstat_rs::db_ws::{get_all_work_limit, get_work_count};
+use common_rs::db_ws::{get_all_work_limit, get_work_count};
 
 use common_rs::common_db::get_db_file;
 use rusqlite::{Connection, OpenFlags};
