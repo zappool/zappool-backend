@@ -1,4 +1,6 @@
-use crate::common_db::{ensure_db_version, get_db_update_versions_from_args, set_current_db_version};
+use crate::common_db::{
+    ensure_db_version, get_db_update_versions_from_args, set_current_db_version,
+};
 use crate::dto_pc::{Block, MinerSnapshot, PayRequest, Payment, Work};
 
 use rusqlite::{Connection, Params, Row, Transaction};
@@ -219,12 +221,8 @@ fn db_update_3_4(conn: &Connection) -> Result<(), Box<dyn Error>> {
     let _ = ensure_db_version(conn, 3)?;
 
     // CommitLastTime: Time of (currently) last time when committed was updated (due to new worktiem or block)
-    let _ = conn.execute(
-        "ALTER TABLE MINER_SS ADD CommitLastTime INTEGER", []
-    )?;
-    let _ = conn.execute(
-        "UPDATE MINER_SS SET CommitLastTime = Time", []
-    )?;
+    let _ = conn.execute("ALTER TABLE MINER_SS ADD CommitLastTime INTEGER", [])?;
+    let _ = conn.execute("UPDATE MINER_SS SET CommitLastTime = Time", [])?;
 
     let _ = set_current_db_version(conn, 4)?;
 
@@ -456,11 +454,13 @@ pub fn work_get_user_totals(
         "SELECT SUM(Committed) AS TotCommitted, SUM(Estimate) AS TotEstimate, MAX(CommitNextTime) AS LastTime \
         FROM WORK WHERE UNameO == ?1;"
     )?;
-    let totals = stmt.query_one((user_o_id,), |row| Ok((
-        row.get::<_, u64>(0).unwrap_or(0),
-        row.get::<_, u64>(1).unwrap_or(0),
-        row.get::<_, u32>(2).unwrap_or(0),
-    )))?;
+    let totals = stmt.query_one((user_o_id,), |row| {
+        Ok((
+            row.get::<_, u64>(0).unwrap_or(0),
+            row.get::<_, u64>(1).unwrap_or(0),
+            row.get::<_, u32>(2).unwrap_or(0),
+        ))
+    })?;
     // println!("sum {:?}", sum);
     Ok(totals)
 }

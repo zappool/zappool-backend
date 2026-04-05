@@ -1,6 +1,6 @@
 use common_rs::common_db::get_db_file;
 use common_rs::db_pc::get_status;
-use paycalc_rs::db_ws::{get_work_after_id, get_work_count};
+use common_rs::db_ws::{get_work_after_id, get_work_count};
 
 use rusqlite::{Connection, OpenFlags};
 use std::error::Error;

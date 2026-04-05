@@ -71,7 +71,7 @@ fn get_current_db_version(conn: &Connection) -> Result<u8, Box<dyn Error>> {
 }
 
 pub fn set_current_db_version(conn: &Connection, newver: u8) -> Result<(), Box<dyn Error>> {
-    let _ = conn.execute("UPDATE VERSION SET Version = ?1", [newver,])?;
+    let _ = conn.execute("UPDATE VERSION SET Version = ?1", [newver])?;
     Ok(())
 }
 
@@ -86,7 +86,11 @@ pub fn print_current_db_version(dbfile: &str) {
 pub fn ensure_db_version(conn: &Connection, expected_ver: u8) -> Result<(), Box<dyn Error>> {
     let cur_ver = get_current_db_version(conn)?;
     if cur_ver != expected_ver {
-        return Err(format!("Invalid DB version, expecting {} actual {}", expected_ver, cur_ver).into());
+        return Err(format!(
+            "Invalid DB version, expecting {} actual {}",
+            expected_ver, cur_ver
+        )
+        .into());
     }
     Ok(())
 }
