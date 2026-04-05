@@ -1,13 +1,15 @@
 [package]
-name = "paycalc-rs"
-version = "1.0.2"
+name = "workstat-rs"
+version = "1.0.0"
 edition = "2024"
 
 [dependencies]
 common-rs = { path = "../common-rs" }
+axum = "0.7"
 dotenv = "0.15.0"
-payer = { path = "../payer" }
 rusqlite = "0.37.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [[bin]]
@@ -19,13 +21,5 @@ name = "__setup_db"
 path = "src/__setup_db/main.rs"
 
 [[bin]]
-name = "main_dashboard"
-path = "src/main_dashboard/main.rs"
-
-[[bin]]
-name = "main_list_work"
-path = "src/main_list_work/main.rs"
-
-[[bin]]
-name = "main_stats"
-path = "src/main_stats/main.rs"
+name = "main_list"
+path = "src/main_list/main.rs"
