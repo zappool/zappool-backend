@@ -49,116 +49,117 @@ def get_db_connection(readonly: bool):
         conn = sqlite3.connect(dbfile)
     return conn
 
-# HTML template for the form
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Work Item Submission</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        input {
-            width: 100%;
-            padding: 8px;
-            box-sizing: border-box;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            cursor: pointer;
-        }
-        .error {
-            color: red;
-            margin-top: 10px;
-        }
-        .success {
-            color: green;
-            margin-top: 10px;
-        }
-    </style>
-</head>
-<body>
-    <h1>Submit New Work Item</h1>
-    <div id="message"></div>
-    
-    <form id="workForm">
-        <div class="form-group">
-            <label for="uname_o">Original Username:</label>
-            <input type="text" id="uname_o" name="uname_o" required>
-        </div>
-        
-        <div class="form-group">
-            <label for="uname_u">Upstream Username:</label>
-            <input type="text" id="uname_u" name="uname_u" required>
-        </div>
-        
-        <div class="form-group">
-            <label for="tdiff">Target Difficulty:</label>
-            <input type="number" id="tdiff" name="tdiff" required min="1">
-        </div>
-        
-        <button type="submit">Submit</button>
-    </form>
-    
-    <script>
-        document.getElementById('workForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = {
-                uname_o: document.getElementById('uname_o').value,
-                uname_u: document.getElementById('uname_u').value,
-                tdiff: parseInt(document.getElementById('tdiff').value)
-            };
-            
-            fetch('/api/work-insert', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData),
-            })
-            .then(response => response.json())
-            .then(data => {
-                const messageDiv = document.getElementById('message');
-                if (data.error) {
-                    messageDiv.className = 'error';
-                    messageDiv.textContent = 'Error: ' + data.error;
-                } else {
-                    messageDiv.className = 'success';
-                    messageDiv.textContent = 'Work item successfully added!';
-                    document.getElementById('workForm').reset();
-                }
-            })
-            .catch(error => {
-                const messageDiv = document.getElementById('message');
-                messageDiv.className = 'error';
-                messageDiv.textContent = 'Error submitting form: ' + error.message;
-            });
-        });
-    </script>
-</body>
-</html>
-"""
 
-@app.route('/')
-def index():
-    """Serve the HTML form for submitting work items."""
-    return render_template_string(HTML_TEMPLATE)
+# # HTML template for the form
+# HTML_TEMPLATE = """
+# <!DOCTYPE html>
+# <html>
+# <head>
+#     <title>Work Item Submission</title>
+#     <style>
+#         body {
+#             font-family: Arial, sans-serif;
+#             max-width: 600px;
+#             margin: 0 auto;
+#             padding: 20px;
+#         }
+#         .form-group {
+#             margin-bottom: 15px;
+#         }
+#         label {
+#             display: block;
+#             margin-bottom: 5px;
+#             font-weight: bold;
+#         }
+#         input {
+#             width: 100%;
+#             padding: 8px;
+#             box-sizing: border-box;
+#         }
+#         button {
+#             background-color: #4CAF50;
+#             color: white;
+#             padding: 10px 15px;
+#             border: none;
+#             cursor: pointer;
+#         }
+#         .error {
+#             color: red;
+#             margin-top: 10px;
+#         }
+#         .success {
+#             color: green;
+#             margin-top: 10px;
+#         }
+#     </style>
+# </head>
+# <body>
+#     <h1>Submit New Work Item</h1>
+#     <div id="message"></div>
+    
+#     <form id="workForm">
+#         <div class="form-group">
+#             <label for="uname_o">Original Username:</label>
+#             <input type="text" id="uname_o" name="uname_o" required>
+#         </div>
+        
+#         <div class="form-group">
+#             <label for="uname_u">Upstream Username:</label>
+#             <input type="text" id="uname_u" name="uname_u" required>
+#         </div>
+        
+#         <div class="form-group">
+#             <label for="tdiff">Target Difficulty:</label>
+#             <input type="number" id="tdiff" name="tdiff" required min="1">
+#         </div>
+        
+#         <button type="submit">Submit</button>
+#     </form>
+    
+#     <script>
+#         document.getElementById('workForm').addEventListener('submit', function(e) {
+#             e.preventDefault();
+            
+#             const formData = {
+#                 uname_o: document.getElementById('uname_o').value,
+#                 uname_u: document.getElementById('uname_u').value,
+#                 tdiff: parseInt(document.getElementById('tdiff').value)
+#             };
+            
+#             fetch('/api/work-insert', {
+#                 method: 'POST',
+#                 headers: {
+#                     'Content-Type': 'application/json',
+#                 },
+#                 body: JSON.stringify(formData),
+#             })
+#             .then(response => response.json())
+#             .then(data => {
+#                 const messageDiv = document.getElementById('message');
+#                 if (data.error) {
+#                     messageDiv.className = 'error';
+#                     messageDiv.textContent = 'Error: ' + data.error;
+#                 } else {
+#                     messageDiv.className = 'success';
+#                     messageDiv.textContent = 'Work item successfully added!';
+#                     document.getElementById('workForm').reset();
+#                 }
+#             })
+#             .catch(error => {
+#                 const messageDiv = document.getElementById('message');
+#                 messageDiv.className = 'error';
+#                 messageDiv.textContent = 'Error submitting form: ' + error.message;
+#             });
+#         });
+#     </script>
+# </body>
+# </html>
+# """
+
+# @app.route('/')
+# def index():
+#     """Serve the HTML form for submitting work items."""
+#     return render_template_string(HTML_TEMPLATE)
 
 @app.route('/api/ping', methods=['GET'])
 def ping():
@@ -218,53 +219,54 @@ def add_work():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# API endpoint for form submissions
-@app.route('/api/work-insert/form', methods=['POST'])
-def add_work_form():
-    """Handle form submissions."""
-    try:
-        # Extract form data
-        uname_o = request.form.get('uname_o', '')
-        uname_u = request.form.get('uname_u', '')
-        tdiff_str = request.form.get('tdiff', '')
-        secret = request.form.get('sev', '')
+
+# # API endpoint for form submissions
+# @app.route('/api/work-insert/form', methods=['POST'])
+# def add_work_form():
+#     """Handle form submissions."""
+#     try:
+#         # Extract form data
+#         uname_o = request.form.get('uname_o', '')
+#         uname_u = request.form.get('uname_u', '')
+#         tdiff_str = request.form.get('tdiff', '')
+#         secret = request.form.get('sev', '')
         
-        # Validate required fields
-        if not uname_o or not uname_u or not tdiff_str or not secret:
-            return render_template_string(
-                HTML_TEMPLATE, 
-                error="All fields are required"
-            )
+#         # Validate required fields
+#         if not uname_o or not uname_u or not tdiff_str or not secret:
+#             return render_template_string(
+#                 HTML_TEMPLATE, 
+#                 error="All fields are required"
+#             )
         
-        # Validate tdiff is an integer
-        try:
-            tdiff = int(tdiff_str)
-            if tdiff <= 0:
-                return render_template_string(
-                    HTML_TEMPLATE,
-                    error="Target difficulty must be a positive integer"
-                )
-        except ValueError:
-            return render_template_string(
-                HTML_TEMPLATE,
-                error="Target difficulty must be an integer"
-            )
+#         # Validate tdiff is an integer
+#         try:
+#             tdiff = int(tdiff_str)
+#             if tdiff <= 0:
+#                 return render_template_string(
+#                     HTML_TEMPLATE,
+#                     error="Target difficulty must be a positive integer"
+#                 )
+#         except ValueError:
+#             return render_template_string(
+#                 HTML_TEMPLATE,
+#                 error="Target difficulty must be an integer"
+#             )
         
-        # Insert work item into database
-        conn = get_db_connection(readonly=False)
-        db_ws.insert_work(conn, uname_o, uname_u, tdiff)
-        conn.close()
+#         # Insert work item into database
+#         conn = get_db_connection(readonly=False)
+#         db_ws.insert_work(conn, uname_o, uname_u, tdiff)
+#         conn.close()
         
-        return render_template_string(
-            HTML_TEMPLATE,
-            success="Work item added successfully"
-        )
+#         return render_template_string(
+#             HTML_TEMPLATE,
+#             success="Work item added successfully"
+#         )
         
-    except Exception as e:
-        return render_template_string(
-            HTML_TEMPLATE,
-            error=f"An error occurred: {str(e)}"
-        )
+#     except Exception as e:
+#         return render_template_string(
+#             HTML_TEMPLATE,
+#             error=f"An error occurred: {str(e)}"
+#         )
 
 
 @app.route('/api/work-count', methods=['GET'])
