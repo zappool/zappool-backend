@@ -16,8 +16,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     for w in work_list {
         println!(
             "{} {} {} {} {} {} {} {} {}",
-            w.db_id, w.uname_o, w.uname_o_wrkr, w.uname_u, w.uname_u_wrkr,
-            w.tdiff, w.time_add, w.time_calc, w.calc_payout
+            w.db_id,
+            w.uname_o,
+            w.uname_o_wrkr,
+            w.uname_u,
+            w.uname_u_wrkr,
+            w.tdiff,
+            w.time_add,
+            w.time_calc,
+            w.calc_payout
         );
     }
 

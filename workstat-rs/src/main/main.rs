@@ -1,8 +1,7 @@
 use common_rs::db_ws;
 
 use axum::{
-    Json,
-    Router,
+    Json, Router,
     extract::{Query, State},
     http::StatusCode,
     routing::{get, post},
@@ -47,41 +46,88 @@ async fn add_work(
 ) -> (StatusCode, Json<Value>) {
     let uname_o = match data.uname_o {
         Some(v) => v,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error": "Missing required field: uname_o"}))),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Missing required field: uname_o"})),
+            );
+        }
     };
     let uname_u = match data.uname_u {
         Some(v) => v,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error": "Missing required field: uname_u"}))),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Missing required field: uname_u"})),
+            );
+        }
     };
     let tdiff_raw = match data.tdiff {
         Some(v) => v,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error": "Missing required field: tdiff"}))),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Missing required field: tdiff"})),
+            );
+        }
     };
-    let tdiff: u32 = match tdiff_raw.as_u64().or_else(|| tdiff_raw.as_str().and_then(|s| s.parse().ok())) {
+    let tdiff: u32 = match tdiff_raw
+        .as_u64()
+        .or_else(|| tdiff_raw.as_str().and_then(|s| s.parse().ok()))
+    {
         Some(v) if v > 0 => v as u32,
-        Some(_) => return (StatusCode::BAD_REQUEST, Json(json!({"error": "Target difficulty must be a positive integer"}))),
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error": "Target difficulty must be an integer"}))),
+        Some(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Target difficulty must be a positive integer"})),
+            );
+        }
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Target difficulty must be an integer"})),
+            );
+        }
     };
     let secret = match data.sec {
         Some(v) => v,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error": "Missing required field: sec"}))),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Missing required field: sec"})),
+            );
+        }
     };
 
     println!("Received work: '{}' '{}' {}", uname_o, uname_u, tdiff);
 
     if secret != state.api_secret {
         println!("Wrong API secret received!");
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Incorrect API secret!"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Incorrect API secret!"})),
+        );
     }
 
     let conn = match get_db_connection(&state.dbfile, false) {
         Ok(c) => c,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("DB connection error: {e}")}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("DB connection error: {e}")})),
+            );
+        }
     };
 
     match db_ws::insert_work_fullname(&conn, &uname_o, &uname_u, tdiff) {
-        Ok(_) => (StatusCode::CREATED, Json(json!({"message": "Work item added successfully"}))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Error inserting {e}")}))),
+        Ok(_) => (
+            StatusCode::CREATED,
+            Json(json!({"message": "Work item added successfully"})),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("Error inserting {e}")})),
+        ),
     }
 }
 
@@ -90,12 +136,20 @@ async fn get_count(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Valu
 
     let conn = match get_db_connection(&state.dbfile, true) {
         Ok(c) => c,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            );
+        }
     };
 
     match db_ws::get_work_count(&conn) {
         Ok(cnt) => (StatusCode::OK, Json(json!({"work_count": cnt}))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        ),
     }
 }
 
@@ -125,13 +179,33 @@ async fn get_work_after_id_handler(
 ) -> (StatusCode, Json<Value>) {
     let start_id: i32 = match params.start_id.as_deref().and_then(|s| s.parse().ok()) {
         Some(v) if v != 0 => v,
-        Some(_) => return (StatusCode::BAD_REQUEST, Json(json!({"error": "Invalid 'start_id' parameter!"}))),
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error": "Missing numeric 'start_id' parameter!"}))),
+        Some(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Invalid 'start_id' parameter!"})),
+            );
+        }
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Missing numeric 'start_id' parameter!"})),
+            );
+        }
     };
     let start_time: u32 = match params.start_time.as_deref().and_then(|s| s.parse().ok()) {
         Some(v) if v != 0 => v,
-        Some(_) => return (StatusCode::BAD_REQUEST, Json(json!({"error": "Invalid 'start_time' parameter!"}))),
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error": "Missing numeric 'start_time' parameter!"}))),
+        Some(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Invalid 'start_time' parameter!"})),
+            );
+        }
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Missing numeric 'start_time' parameter!"})),
+            );
+        }
     };
     let limit: u32 = params
         .limit
@@ -141,7 +215,12 @@ async fn get_work_after_id_handler(
 
     let conn = match get_db_connection(&state.dbfile, true) {
         Ok(c) => c,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            );
+        }
     };
 
     match db_ws::get_work_after_id(&conn, start_id, start_time, limit) {
@@ -162,7 +241,10 @@ async fn get_work_after_id_handler(
                 .collect();
             (StatusCode::OK, Json(json!(as_json)))
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        ),
     }
 }
 
