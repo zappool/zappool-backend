@@ -1,7 +1,7 @@
 use crate::db_oc;
-use crate::db_ws::get_work_after_id;
 
 use common_rs::db_pc as db;
+use common_rs::db_ws::get_work_after_id;
 use common_rs::dto_pc::{Block, MinerSnapshot, Work};
 
 use rusqlite::Connection;
