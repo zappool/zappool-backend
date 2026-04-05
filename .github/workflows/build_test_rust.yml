@@ -2,16 +2,16 @@ name: Build and test Rust
 
 on:
   push:
-    branches: [ "main", "multi", "braiins" ]
+    branches: [ "main", "staging", "multi", "braiins" ]
   pull_request:
-    branches: [ "main", "multi", "braiins" ]
+    branches: [ "main", "staging", "multi", "braiins" ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-    name: Build
+    name: Build & Test
     runs-on: ubuntu-latest
     steps:
     # - name: Set up Rust
@@ -21,19 +21,8 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: Build Rust
       run: |
-        cd common-rs && cargo build && cd ..
         cd payer && cargo build && cd ..
         cd paycalc-rs && cargo build && cd ..
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-    # - name: Set up Rust
-    #   run: sudo apt-get install cargo && rustup override set 1.85
-    - uses: dtolnay/rust-toolchain@stable
-    - uses: actions/checkout@v4
-    - uses: Swatinem/rust-cache@v2
     - name: Run unit tests
       run: |
         cd common-rs && cargo test && cd ..
@@ -49,7 +38,5 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: |
-          cd common-rs && cargo fmt --all -- --check && cd ..
-          cd payer && cargo fmt --all -- --check && cd ..
-          cd paycalc-rs && cargo fmt --all -- --check && cd ..
-          # cargo clippy --all-features -- -D warnings
+          cargo fmt --all -- --check
+          cargo clippy --all-features -- -D warnings
