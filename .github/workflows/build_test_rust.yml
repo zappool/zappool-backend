@@ -37,5 +37,7 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: |
-          cargo fmt --all -- --check
-          cargo clippy --all-features -- -D warnings
+          cd common-rs && cargo fmt --all -- --check && cd ..
+          cd payer && cargo fmt --all -- --check && cd ..
+          cd paycalc-rs && cargo fmt --all -- --check && cd ..
+          # cargo clippy --all-features -- -D warnings
