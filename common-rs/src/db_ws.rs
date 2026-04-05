@@ -106,7 +106,13 @@ fn get_or_insert_us_user(
 }
 
 pub fn insert_work_raw(conn: &Connection, w: Work) -> Result<(), Box<dyn Error>> {
-    let user_orig_id = get_or_insert_orig_user(conn, &w.uname_o, &w.uname_o_wrkr, &w.uname_u_wrkr, w.time_add)?;
+    let user_orig_id = get_or_insert_orig_user(
+        conn,
+        &w.uname_o,
+        &w.uname_o_wrkr,
+        &w.uname_u_wrkr,
+        w.time_add,
+    )?;
     let user_us_id = get_or_insert_us_user(conn, &w.uname_u, w.time_add)?;
 
     conn.execute(
@@ -117,7 +123,12 @@ pub fn insert_work_raw(conn: &Connection, w: Work) -> Result<(), Box<dyn Error>>
     Ok(())
 }
 
-pub fn insert_work_fullname(conn: &Connection, uname_o: &str, uname_u: &str, tdiff: u32) -> Result<(), Box<dyn Error>> {
+pub fn insert_work_fullname(
+    conn: &Connection,
+    uname_o: &str,
+    uname_u: &str,
+    tdiff: u32,
+) -> Result<(), Box<dyn Error>> {
     let (uname_o, uname_o_wrkr) = Work::split_username_worker(uname_o);
     let (uname_u, uname_u_wrkr) = Work::split_username_worker(uname_u);
     let time_add = SystemTime::now()
