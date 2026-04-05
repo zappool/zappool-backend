@@ -2,9 +2,9 @@ name: Build and test Rust
 
 on:
   push:
-    branches: [ "main", "multi", "braiins" ]
+    branches: [ "main", "staging", "multi", "braiins" ]
   pull_request:
-    branches: [ "main", "multi", "braiins" ]
+    branches: [ "main", "staging", "multi", "braiins" ]
 
 env:
   CARGO_TERM_COLOR: always
