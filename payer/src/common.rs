@@ -14,7 +14,9 @@ pub enum PaymentMethod {
 }
 
 /// Return all payment methods
-pub fn payment_methods() -> Vec<&'static PaymentMethod> { PAYMENT_METHODS.to_vec() }
+pub fn payment_methods() -> Vec<&'static PaymentMethod> {
+    PAYMENT_METHODS.to_vec()
+}
 
 const PAYMENT_METHODS: &'static [&'static PaymentMethod] = &[
     &PaymentMethod::PmLnAddress,

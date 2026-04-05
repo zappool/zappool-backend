@@ -2,26 +2,42 @@ name: Build and test Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "multi", "braiins" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "multi", "braiins" ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
+    name: Build & Test
     runs-on: ubuntu-latest
-
     steps:
-    - name: Set up Rust
-      run: sudo apt-get install cargo && rustup override set 1.85
+    # - name: Set up Rust
+    #   run: sudo apt-get install cargo && rustup override set 1.85
+    - uses: dtolnay/rust-toolchain@stable
     - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
     - name: Build Rust
-      run: cd paycalc-rs && cargo build
+      run: |
+        cd payer && cargo build && cd ..
+        cd paycalc-rs && cargo build && cd ..
     - name: Run unit tests
       run: |
         cd payer && cargo test && cd ..
         cd paycalc-rs && cargo test && cd ..
 
+  check:
+    name: Check fmt, clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: |
+          cd common-rs && cargo fmt --all -- --check && cd ..
+          cd payer && cargo fmt --all -- --check && cd ..
+          cd paycalc-rs && cargo fmt --all -- --check && cd ..
+          # cargo clippy --all-features -- -D warnings

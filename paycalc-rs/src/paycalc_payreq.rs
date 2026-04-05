@@ -409,7 +409,9 @@ fn update_miner_snapshots_and_create_payreqs(
     }
 
     let _ = conntx.commit()?;
-    println!("update_miner_snapshots_and_create_payreqs: Updated miner snapshots (cnt {cnt}), created pay requests");
+    println!(
+        "update_miner_snapshots_and_create_payreqs: Updated miner snapshots (cnt {cnt}), created pay requests"
+    );
     Ok(())
 }
 
@@ -455,7 +457,8 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
             "Next payreq check time in {:.1} secs ({})",
             diff, next_new_time
         );
-        loop { // wait
+        loop {
+            // wait
             let now_utc = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
