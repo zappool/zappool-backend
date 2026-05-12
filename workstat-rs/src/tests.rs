@@ -1,5 +1,5 @@
 use crate::server::{ServerHandle, start_server};
-use common_rs::db_ws::db_setup_1;
+use common_rs::db_ws::db_setup_from_to;
 
 use axum::http::StatusCode;
 use rusqlite::Connection;
@@ -15,7 +15,7 @@ async fn make_test_state() -> (NamedTempFile, ServerHandle) {
     let tmpfile = NamedTempFile::new().unwrap();
     let path = tmpfile.path().to_str().unwrap().to_string();
     let conn = Connection::open(&path).unwrap();
-    db_setup_1(&conn).unwrap();
+    db_setup_from_to(&conn, Some(0), None).unwrap();
     drop(conn);
     let server_handle = start_server(PORT, path.clone(), TEST_SECRET.into()).await;
     (tmpfile, server_handle)

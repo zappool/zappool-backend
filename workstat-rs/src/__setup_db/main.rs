@@ -1,6 +1,6 @@
-use common_rs::db_ws::db_setup_1;
-
 use common_rs::common_db::get_db_file;
+use common_rs::db_ws::db_setup;
+
 use rusqlite::Connection;
 use std::io::stdin;
 
@@ -16,7 +16,7 @@ fn main() {
     }
 
     let conn = Connection::open(&dbfile).unwrap();
-    db_setup_1(&conn).unwrap();
+    db_setup(&conn).unwrap();
     let _ = conn.close();
 
     println!("New empty DB created, don't forget to rename! {dbfile}");
