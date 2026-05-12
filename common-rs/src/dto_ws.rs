@@ -1,6 +1,6 @@
-use serde::Serialize;
+use std::u32;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct Work {
     pub db_id: u32,
     pub uname_o: String,

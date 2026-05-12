@@ -152,7 +152,8 @@ pub fn insert_work_fullname(
 }
 
 fn work_from_row(row: &Row) -> Result<Work, rusqlite::Error> {
-    Ok(Work::new(
+    // println!("work_From_row {0:?}", row);
+    let w = Work::new(
         row.get(0)?,
         row.get::<_, String>(1)?,
         row.get::<_, String>(2)?,
@@ -162,32 +163,12 @@ fn work_from_row(row: &Row) -> Result<Work, rusqlite::Error> {
         row.get(6)?,
         row.get(7)?,
         row.get(8)?,
-    ))
+    );
+    // println!("work_From_row {0}", w.db_id);
+    Ok(w)
 }
 
-pub fn get_all_work_limit(conn: &Connection, limit: u32) -> Result<Vec<Work>, Box<dyn Error>> {
-    let query_str = "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout \
-        FROM WORK \
-        LEFT OUTER JOIN ORUSER ON WORK.UNameO = ORUSER.Id \
-        LEFT OUTER JOIN USUSER ON WORK.UNameU = USUSER.Id \
-        ORDER BY WORK.TimeAdd DESC";
-
-    let vector = if limit == 0 {
-        let mut stmt = conn.prepare(query_str)?;
-        stmt.query_map([], |row| work_from_row(row))?
-            .filter_map(|r| r.ok())
-            .collect()
-    } else {
-        let query_with_limit = query_str.to_string() + " LIMIT ?1;";
-        let mut stmt = conn.prepare(&query_with_limit)?;
-        stmt.query_map([limit], |row| work_from_row(row))?
-            .filter_map(|r| r.ok())
-            .collect()
-    };
-    Ok(vector)
-}
-
-/// - start_id: Start after this ID, exclusive
+/// - start_id: Start after this ID,exclusive
 /// - start_time: Start at this time, inclusive
 /// - limit: limit the number of entries returned (0=unlimited)
 pub fn get_work_after_id(
@@ -198,19 +179,22 @@ pub fn get_work_after_id(
 ) -> Result<Vec<Work>, Box<dyn Error>> {
     let query_str = "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout \
         FROM WORK \
-        LEFT OUTER JOIN ORUSER ON WORK.UNameO = ORUSER.Id \
-        LEFT OUTER JOIN USUSER ON WORK.UNameU = USUSER.Id \
+        LEFT OUTER JOIN ORUSER \
+        ON WORK.UNameO = ORUSER.Id \
+        LEFT OUTER JOIN USUSER \
+        ON WORK.UNameU = USUSER.Id \
         WHERE WORK.Id > ?1 AND WORK.TimeAdd >= ?2 \
-        ORDER BY WORK.Id ASC";
+        ORDER BY WORK.Id ASC ";
 
     let vector = if limit == 0 {
         let params = [start_id.to_string(), start_time.to_string()];
         let mut stmt = conn.prepare(query_str)?;
         stmt.query_map(params, |row| work_from_row(row))?
-            .filter_map(|r| r.ok())
-            .collect()
+            .filter(|wir| wir.is_ok())
+            .map(|wir| wir.unwrap())
+            .collect::<Vec<Work>>()
     } else {
-        let query_with_limit = query_str.to_string() + " LIMIT ?3;";
+        let query_with_limit = query_str.to_string() + " LIMIT ?3 ;";
         let params = [
             start_id.to_string(),
             start_time.to_string(),
@@ -218,14 +202,16 @@ pub fn get_work_after_id(
         ];
         let mut stmt = conn.prepare(&query_with_limit)?;
         stmt.query_map(params, |row| work_from_row(row))?
-            .filter_map(|r| r.ok())
-            .collect()
+            .filter(|wir| wir.is_ok())
+            .map(|wir| wir.unwrap())
+            .collect::<Vec<Work>>()
     };
     Ok(vector)
 }
 
 pub fn get_work_count(conn: &Connection) -> Result<u32, Box<dyn Error>> {
     let mut stmt = conn.prepare("SELECT COUNT(*) FROM WORK")?;
+
     let res = stmt.query_one([], |row| Ok(row.get::<_, u32>(0).unwrap_or(0)))?;
     Ok(res)
 }
@@ -234,6 +220,39 @@ pub fn get_work_count(conn: &Connection) -> Result<u32, Box<dyn Error>> {
 mod tests {
     use super::*;
     use rusqlite::Connection;
+
+    fn db_setup_1(conn: &Connection) -> Result<(), Box<dyn Error>> {
+        // Create table ORUser  (ORiginal User)
+        let _ = conn.execute(
+            "CREATE TABLE ORUSER \
+                (Id INTEGER PRIMARY KEY AUTOINCREMENT, UNameO VARCHAR(100), UNameO_wrkr VARCHAR(100), UNameU_wrkr VARCHAR(100), TimeAdd INTEGER);",
+            [],
+        )?;
+
+        // Create table USUser  (UpStream User)
+        let _ = conn.execute(
+            "CREATE TABLE USUSER \
+                (Id INTEGER PRIMARY KEY AUTOINCREMENT, UNameU VARCHAR(100), TimeAdd INTEGER);",
+            [],
+        )?;
+
+        let _ = conn.execute(
+            "CREATE TABLE WORK (\
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,\
+                UNameO INTEGER,\
+                UNameU INTEGER,\
+                TDiff INTEGER,\
+                TimeAdd INTEGER,\
+                TimeCalc INTEGER,\
+                CalcPayout INTEGER, \
+                FOREIGN KEY (UNameO) REFERENCES ORUSER(Id) \
+                FOREIGN KEY (UNameU) REFERENCES USUSER(Id) \
+            );",
+            [],
+        )?;
+        let _ = conn.execute("CREATE INDEX WorkTimeAdd ON WORK (TimeAdd);", [])?;
+        Ok(())
+    }
 
     fn create_test_db(conn: &Connection) -> Result<(), Box<dyn Error>> {
         // Create a test database with WORK table
@@ -250,25 +269,22 @@ mod tests {
         Ok(())
     }
 
+    // fn delete_test_db() -> Result<(), Box<dyn Error>> {
+    //     // Clean up any existing test database
+    //     let _ = fs::remove_file(TEST_DB_FILENAME);
+    //     Ok(())
+    // }
+
     #[test]
     fn test_get_work_count() {
         let conn = Connection::open_in_memory().unwrap();
         create_test_db(&conn).unwrap();
 
+        // Test our function
         let count = get_work_count(&conn).unwrap();
         assert_eq!(count, 5);
-    }
 
-    #[test]
-    fn test_get_all_work_limit() {
-        let conn = Connection::open_in_memory().unwrap();
-        create_test_db(&conn).unwrap();
-
-        let all = get_all_work_limit(&conn, 0).unwrap();
-        assert_eq!(all.len(), 5);
-
-        let limited = get_all_work_limit(&conn, 2).unwrap();
-        assert_eq!(limited.len(), 2);
+        // delete_test_db()?;
     }
 
     #[test]
