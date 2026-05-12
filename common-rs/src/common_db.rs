@@ -77,8 +77,9 @@ pub fn set_current_db_version(conn: &Connection, newver: u8) -> Result<(), Box<d
 
 pub fn print_current_db_version(dbfile: &str) {
     if let Ok(conn) = Connection::open_with_flags(dbfile, OpenFlags::SQLITE_OPEN_READ_ONLY) {
-        if let Ok(ver) = get_current_db_version(&conn) {
-            println!("Current DB version: v{ver}  ({dbfile})");
+        match get_current_db_version(&conn) {
+            Ok(ver) => println!("Current DB version: v{ver}  ({dbfile})"),
+            Err(err) => println!("DB version could not be read, err: {err}"),
         }
     }
 }

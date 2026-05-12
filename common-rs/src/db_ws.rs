@@ -1,3 +1,7 @@
+use crate::common_db::{
+    //ensure_db_version, get_db_update_versions_from_args, set_current_db_version,
+    get_db_update_versions_from_args,
+};
 use crate::dto_ws::Work;
 use crate::username::split_full_username;
 
@@ -5,7 +9,35 @@ use rusqlite::{Connection, Row};
 use std::error::Error;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub fn db_setup_1(conn: &Connection) -> Result<(), Box<dyn Error>> {
+pub static LATEST_DB_VERSION: u8 = 2;
+
+// Upgrade from an older version, versions taken from args
+pub fn db_setup(conn: &Connection) -> Result<(), Box<dyn Error>> {
+    let (vto, vfrom) = get_db_update_versions_from_args(LATEST_DB_VERSION);
+    db_setup_from_to(conn, Some(vfrom), Some(vto))
+}
+
+// Upgrade from an older version, versions have default values
+pub fn db_setup_from_to(
+    conn: &Connection,
+    vfrom: Option<u8>,
+    vto: Option<u8>,
+) -> Result<(), Box<dyn Error>> {
+    let vfrom = vfrom.unwrap_or(0);
+    let vto = vto.unwrap_or(LATEST_DB_VERSION);
+    println!("Updating DB from v{vfrom} to v{vto}");
+
+    if vfrom <= 0 && vto >= 1 {
+        db_update_0_1(conn)?;
+    }
+    if vfrom <= 1 && vto >= 2 {
+        db_update_1_2(conn)?;
+    }
+
+    Ok(())
+}
+
+fn db_update_0_1(conn: &Connection) -> Result<(), Box<dyn Error>> {
     // Create table ORUser  (ORiginal User)
     conn.execute(
         "CREATE TABLE ORUSER \
@@ -44,6 +76,23 @@ pub fn db_setup_1(conn: &Connection) -> Result<(), Box<dyn Error>> {
         [],
     )?;
     conn.execute("CREATE INDEX WorkTimeAdd ON WORK (TimeAdd);", [])?;
+
+    Ok(())
+}
+
+fn db_update_1_2(conn: &Connection) -> Result<(), Box<dyn Error>> {
+    //let _ = ensure_db_version(conn, 1)?;  // no VERSION table yet
+
+    let _ = conn.execute("CREATE TABLE VERSION (Version INTEGER)", [])?;
+    let _ = conn.execute("INSERT INTO VERSION (Version) VALUES (1)", [])?;
+
+    let _ = conn.execute("ALTER TABLE WORK ADD Pool INTEGER", [])?;
+    let _ = conn.execute("UPDATE WORK SET Pool = 0", [])?;
+
+    // let _ = set_current_db_version(conn, 2)?;
+    let _ = conn.execute("UPDATE VERSION SET Version = 2", [])?;
+
+    // Note: auto commit
 
     Ok(())
 }
@@ -237,7 +286,7 @@ mod tests {
 
     fn create_test_db(conn: &Connection) -> Result<(), Box<dyn Error>> {
         // Create a test database with WORK table
-        db_setup_1(&conn)?;
+        db_setup_from_to(&conn, Some(0), None)?;
         conn.execute("INSERT INTO ORUSER (Id, UNameO, UNameO_wrkr, UNameU_wrkr, TimeAdd) VALUES (11, 'uname_o_11', 'wrk11', 'uname_u_11', 100);", [])?;
         conn.execute(
             "INSERT INTO USUSER (Id, UNameU, TimeAdd) VALUES (12, 'uname_u_12', 100);",
