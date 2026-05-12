@@ -23,10 +23,12 @@ jobs:
       run: |
         cd payer && cargo build && cd ..
         cd paycalc-rs && cargo build && cd ..
+        cd workstat-rs && cargo build && cd ..
     - name: Run unit tests
       run: |
         cd payer && cargo test && cd ..
         cd paycalc-rs && cargo test && cd ..
+        cd workstat-rs && cargo test && cd ..
 
   check:
     name: Check fmt, clippy
@@ -40,4 +42,5 @@ jobs:
           cd common-rs && cargo fmt --all -- --check && cd ..
           cd payer && cargo fmt --all -- --check && cd ..
           cd paycalc-rs && cargo fmt --all -- --check && cd ..
+          cd workstat-rs && cargo fmt --all -- --check && cd ..
           # cargo clippy --all-features -- -D warnings
