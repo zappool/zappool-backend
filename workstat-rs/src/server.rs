@@ -12,6 +12,9 @@ use serde_json::{Value, json};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::oneshot;
 
+const DEFAULT_POOL: u8 = 1;
+const VALID_POOLS: [u8; 1] = [DEFAULT_POOL];
+
 #[derive(Clone, Debug)]
 struct AppState {
     dbfile: String,
@@ -37,6 +40,7 @@ struct WorkInsertRequest {
     uname_u: Option<String>,
     tdiff: Option<Value>,
     sec: Option<String>,
+    pool: Option<Value>,
 }
 
 async fn add_work(
@@ -97,8 +101,46 @@ async fn add_work(
             );
         }
     };
+    let pool = match data.pool {
+        Some(v) => {
+            match v
+                .as_u64()
+                .or_else(|| tdiff_raw.as_str().and_then(|s| s.parse().ok()))
+            {
+                Some(v) => {
+                    if v <= 255 {
+                        let v8 = v as u8;
+                        if VALID_POOLS.contains(&v8) {
+                            v8
+                        } else {
+                            return (
+                                StatusCode::BAD_REQUEST,
+                                Json(json!({"error": format!("Unknown pool {v8}")})),
+                            );
+                        }
+                    } else {
+                        return (
+                            StatusCode::BAD_REQUEST,
+                            Json(json!({"error": "Pool must be a byte"})),
+                        );
+                    }
+                }
+                None => {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({"error": "Pool must be an integer"})),
+                    );
+                }
+            }
+        }
+        // If pool is missing, use the default
+        None => DEFAULT_POOL,
+    };
 
-    println!("Received work: '{}' '{}' {}", uname_o, uname_u, tdiff);
+    println!(
+        "Received work: '{}' '{}' {} P{}",
+        uname_o, uname_u, tdiff, pool
+    );
 
     if secret != state.api_secret {
         println!("Wrong API secret received!");
@@ -118,7 +160,7 @@ async fn add_work(
         }
     };
 
-    match db_ws::insert_work_fullname(&conn, &uname_o, &uname_u, tdiff) {
+    match db_ws::insert_work_fullname(&conn, &uname_o, &uname_u, tdiff, pool) {
         Ok(_) => (
             StatusCode::CREATED,
             Json(json!({"message": "Work item added successfully"})),
@@ -167,6 +209,7 @@ struct WorkJson {
     uname_u: String,
     uname_u_wrkr: String,
     tdiff: u32,
+    pool: u8,
     time_add: f64,
     time_calc: u32,
     calc_payout: u32,
@@ -233,6 +276,7 @@ async fn get_work_after_id_handler(
                     uname_u: w.uname_u,
                     uname_u_wrkr: w.uname_u_wrkr,
                     tdiff: w.tdiff,
+                    pool: w.pool,
                     time_add: w.time_add,
                     time_calc: w.time_calc,
                     calc_payout: w.calc_payout,
