@@ -77,7 +77,7 @@ This provides a user-friendly form to submit new work items.
 ```bash
 curl -X POST http://localhost:5004/api/work-insert \
   -H "Content-Type: application/json" \
-  -d '{"uname_o": "user1", "uname_u": "upstream1", "tdiff": 100, "sec": "secret_value", "pool": 0}'
+  -d '{"uname_o": "user1", "uname_u": "upstream1", "tdiff": 100, "sec": "secret_value", "pool": 1}'
 ```
 
 ### Using Python requests
@@ -91,7 +91,7 @@ data = {
     "uname_o": "user1",
     "uname_u": "upstream1",
     "tdiff": 100,
-    "pool": 0,
+    "pool": 1,
 }
 headers = {"Content-Type": "application/json"}
 
