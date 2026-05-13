@@ -72,7 +72,7 @@ async fn test_work_insert() {
         "uname_u": "upstream.worker2",
         "tdiff": 131072,
         "sec": TEST_SECRET,
-        "pool": 0,
+        "pool": 1,
     });
     let response = app
         .oneshot(
@@ -116,7 +116,7 @@ async fn test_work_count_after_insert() {
         "uname_u": "upstream",
         "tdiff": 65536,
         "sec": TEST_SECRET,
-        "pool": 0,
+        "pool": 1,
     });
     let insert_response = create_app(Arc::clone(&state))
         .oneshot(
