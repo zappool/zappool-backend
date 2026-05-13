@@ -4,6 +4,7 @@
 members = [
     "common-rs",
     "payer",
+    "stratum-hooked",
     "workstat-rs",
 ]
 exclude = [
