@@ -85,8 +85,9 @@ fn db_update_1_2(conn: &Connection) -> Result<(), Box<dyn Error>> {
     let _ = conn.execute("CREATE TABLE VERSION (Version INTEGER)", [])?;
     let _ = conn.execute("INSERT INTO VERSION (Version) VALUES (1)", [])?;
 
-    let _ = conn.execute("ALTER TABLE WORK ADD Pool INTEGER", [])?;
-    let _ = conn.execute("UPDATE WORK SET Pool = 0", [])?;
+    // Upstream Pool, u8. Valid values: 1: Ocean, etc. Default: 1
+    let _ = conn.execute("ALTER TABLE WORK ADD USPool INTEGER", [])?;
+    let _ = conn.execute("UPDATE WORK SET USPool = 1", [])?;
 
     // let _ = set_current_db_version(conn, 2)?;
     let _ = conn.execute("UPDATE VERSION SET Version = 2", [])?;
@@ -165,7 +166,7 @@ pub fn insert_work_raw(conn: &Connection, w: Work) -> Result<(), Box<dyn Error>>
     let user_us_id = get_or_insert_us_user(conn, &w.uname_u, w.time_add)?;
 
     conn.execute(
-        "INSERT INTO WORK (UNameO, UNameU, TDiff, TimeAdd, TimeCalc, CalcPayout, Pool) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO WORK (UNameO, UNameU, TDiff, TimeAdd, TimeCalc, CalcPayout, USPool) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         rusqlite::params![user_orig_id, user_us_id, w.tdiff, w.time_add, w.time_calc, w.calc_payout, w.pool],
     )?;
 
@@ -217,7 +218,7 @@ fn work_from_row(row: &Row) -> Result<Work, rusqlite::Error> {
 }
 
 pub fn get_all_work_limit(conn: &Connection, limit: u32) -> Result<Vec<Work>, Box<dyn Error>> {
-    let query_str = "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.Pool, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout \
+    let query_str = "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.USPool, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout \
         FROM WORK \
         LEFT OUTER JOIN ORUSER ON WORK.UNameO = ORUSER.Id \
         LEFT OUTER JOIN USUSER ON WORK.UNameU = USUSER.Id \
@@ -247,7 +248,7 @@ pub fn get_work_after_id(
     start_time: u32,
     limit: u32,
 ) -> Result<Vec<Work>, Box<dyn Error>> {
-    let query_str = "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.Pool, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout \
+    let query_str = "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.USPool, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout \
         FROM WORK \
         LEFT OUTER JOIN ORUSER ON WORK.UNameO = ORUSER.Id \
         LEFT OUTER JOIN USUSER ON WORK.UNameU = USUSER.Id \
@@ -296,8 +297,8 @@ mod tests {
         )?;
         for i in 0..5 {
             let time_add = 1_000_000 + i * 1_000;
-            let pool: u8 = if i >= 4 { 1 } else { 0 };
-            conn.execute("INSERT INTO WORK (UNameO, UNameU, TDiff, TimeAdd, TimeCalc, CalcPayout, Pool) VALUES (11, 12, 131072, ?1, 0, 0, ?2);", [time_add.to_string(), pool.to_string()])?;
+            let pool: u8 = if i >= 4 { 2 } else { 1 };
+            conn.execute("INSERT INTO WORK (UNameO, UNameU, TDiff, USPool, TimeAdd, TimeCalc, CalcPayout) VALUES (11, 12, 131072, ?1, ?2, 0, 0);", [pool.to_string(), time_add.to_string()])?;
         }
         Ok(())
     }
@@ -328,7 +329,7 @@ mod tests {
                 "uname_u_12".to_string(),
                 "wrk_u_11".to_string(),
                 131072,
-                1,
+                2,
                 1004000.0,
                 0,
                 0,
@@ -338,8 +339,8 @@ mod tests {
         assert_eq!(all[0].time_add, 1004000.0);
         assert_eq!(all[4].time_add, 1000000.0);
         // check that pool varies
-        assert_eq!(all[0].pool, 1);
-        assert_eq!(all[4].pool, 0);
+        assert_eq!(all[0].pool, 2);
+        assert_eq!(all[4].pool, 1);
 
         let limited = get_all_work_limit(&conn, 2).unwrap();
         assert_eq!(limited.len(), 2);
