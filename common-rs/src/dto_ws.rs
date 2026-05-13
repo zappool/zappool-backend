@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Work {
     pub db_id: u32,
     pub uname_o: String,
@@ -11,6 +11,7 @@ pub struct Work {
     pub time_add: f64,
     pub time_calc: u32,
     pub calc_payout: u32,
+    pub pool: u8,
 }
 
 impl Work {
@@ -24,6 +25,7 @@ impl Work {
         time_add: f64,
         time_calc: u32,
         calc_payout: u32,
+        pool: u8,
     ) -> Self {
         Self {
             db_id,
@@ -35,6 +37,7 @@ impl Work {
             time_add,
             time_calc,
             calc_payout,
+            pool,
         }
     }
 
