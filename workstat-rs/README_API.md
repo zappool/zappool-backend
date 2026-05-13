@@ -16,14 +16,14 @@ cargo build
 ./target/debug/workstat
 ```
 
-This will start a development server on `http://localhost:5000`.
+This will start a development server on `http://localhost:5004`.
 
 ## Using the API
 
 ### HTML Form Interface
 Access the form interface by navigating to:
 ```
-http://localhost:5000/
+http://localhost:5004/
 ```
 
 This provides a user-friendly form to submit new work items.
@@ -75,9 +75,9 @@ This provides a user-friendly form to submit new work items.
 ### Using curl
 
 ```bash
-curl -X POST http://localhost:5000/api/work-insert \
+curl -X POST http://localhost:5004/api/work-insert \
   -H "Content-Type: application/json" \
-  -d '{"uname_o": "user1", "uname_u": "upstream1", "tdiff": 100, "sec": "secret_value"}'
+  -d '{"uname_o": "user1", "uname_u": "upstream1", "tdiff": 100, "sec": "secret_value", "pool": 0}'
 ```
 
 ### Using Python requests
@@ -90,7 +90,8 @@ url = "http://localhost:5000/-insert"
 data = {
     "uname_o": "user1",
     "uname_u": "upstream1",
-    "tdiff": 100
+    "tdiff": 100,
+    "pool": 0,
 }
 headers = {"Content-Type": "application/json"}
 
