@@ -17,7 +17,7 @@ pub fn db_setup(conn: &Connection) -> Result<(), Box<dyn Error>> {
 }
 
 // Upgrade from an older version, versions have default values
-fn db_setup_from_to(
+pub fn db_setup_from_to(
     conn: &Connection,
     vfrom: Option<u8>,
     vto: Option<u8>,
