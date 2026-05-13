@@ -166,8 +166,8 @@ pub fn insert_work_raw(conn: &Connection, w: Work) -> Result<(), Box<dyn Error>>
     let user_us_id = get_or_insert_us_user(conn, &w.uname_u, w.time_add)?;
 
     conn.execute(
-        "INSERT INTO WORK (UNameO, UNameU, TDiff, TimeAdd, TimeCalc, CalcPayout) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        rusqlite::params![user_orig_id, user_us_id, w.tdiff, w.time_add, w.time_calc, w.calc_payout],
+        "INSERT INTO WORK (UNameO, UNameU, TDiff, TimeAdd, TimeCalc, CalcPayout, Pool) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![user_orig_id, user_us_id, w.tdiff, w.time_add, w.time_calc, w.calc_payout, w.pool],
     )?;
 
     Ok(())
@@ -195,6 +195,7 @@ pub fn insert_work_fullname(
         time_add,
         time_calc: 0,
         calc_payout: 0,
+        pool: 0,
     };
 
     insert_work_raw(conn, w)
@@ -211,11 +212,12 @@ fn work_from_row(row: &Row) -> Result<Work, rusqlite::Error> {
         row.get(6)?,
         row.get(7)?,
         row.get(8)?,
+        row.get(9)?,
     ))
 }
 
 pub fn get_all_work_limit(conn: &Connection, limit: u32) -> Result<Vec<Work>, Box<dyn Error>> {
-    let query_str = "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout \
+    let query_str = "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout, WORK.Pool \
         FROM WORK \
         LEFT OUTER JOIN ORUSER ON WORK.UNameO = ORUSER.Id \
         LEFT OUTER JOIN USUSER ON WORK.UNameU = USUSER.Id \
@@ -245,7 +247,7 @@ pub fn get_work_after_id(
     start_time: u32,
     limit: u32,
 ) -> Result<Vec<Work>, Box<dyn Error>> {
-    let query_str = "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout \
+    let query_str = "SELECT WORK.Id, ORUSER.UNameO, ORUSER.UNameO_wrkr, USUSER.UNameU, ORUSER.UNameU_wrkr, WORK.TDiff, WORK.TimeAdd, WORK.TimeCalc, WORK.CalcPayout, WORK.Pool \
         FROM WORK \
         LEFT OUTER JOIN ORUSER ON WORK.UNameO = ORUSER.Id \
         LEFT OUTER JOIN USUSER ON WORK.UNameU = USUSER.Id \
@@ -287,14 +289,15 @@ mod tests {
     fn create_test_db(conn: &Connection) -> Result<(), Box<dyn Error>> {
         // Create a test database with WORK table
         db_setup_from_to(&conn, Some(0), None)?;
-        conn.execute("INSERT INTO ORUSER (Id, UNameO, UNameO_wrkr, UNameU_wrkr, TimeAdd) VALUES (11, 'uname_o_11', 'wrk11', 'uname_u_11', 100);", [])?;
+        conn.execute("INSERT INTO ORUSER (Id, UNameO, UNameO_wrkr, UNameU_wrkr, TimeAdd) VALUES (11, 'uname_o_11', 'wrk_o_11', 'wrk_u_11', 100);", [])?;
         conn.execute(
             "INSERT INTO USUSER (Id, UNameU, TimeAdd) VALUES (12, 'uname_u_12', 100);",
             [],
         )?;
         for i in 0..5 {
             let time_add = 1_000_000 + i * 1_000;
-            conn.execute("INSERT INTO WORK (UNameO, UNameU, TDiff, TimeAdd, TimeCalc, CalcPayout) VALUES (11, 12, 131072, ?1, 0, 0);", [time_add.to_string()])?;
+            let pool: u8 = if i >= 4 { 1 } else { 0 };
+            conn.execute("INSERT INTO WORK (UNameO, UNameU, TDiff, TimeAdd, TimeCalc, CalcPayout, Pool) VALUES (11, 12, 131072, ?1, 0, 0, ?2);", [time_add.to_string(), pool.to_string()])?;
         }
         Ok(())
     }
@@ -315,6 +318,28 @@ mod tests {
 
         let all = get_all_work_limit(&conn, 0).unwrap();
         assert_eq!(all.len(), 5);
+        // check a work item fully
+        assert_eq!(
+            all[0],
+            Work::new(
+                5,
+                "uname_o_11".to_string(),
+                "wrk_o_11".to_string(),
+                "uname_u_12".to_string(),
+                "wrk_u_11".to_string(),
+                131072,
+                1004000.0,
+                0,
+                0,
+                1
+            )
+        );
+        // check that time_added varies
+        assert_eq!(all[0].time_add, 1004000.0);
+        assert_eq!(all[4].time_add, 1000000.0);
+        // check that pool varies
+        assert_eq!(all[0].pool, 1);
+        assert_eq!(all[4].pool, 0);
 
         let limited = get_all_work_limit(&conn, 2).unwrap();
         assert_eq!(limited.len(), 2);
