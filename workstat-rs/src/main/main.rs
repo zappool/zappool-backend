@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{env, sync::Arc};
 
-const DEFAULT_POOL: u8 = 0;
+const DEFAULT_POOL: u8 = 1;
 const VALID_POOLS: [u8; 1] = [DEFAULT_POOL];
 
 #[derive(Clone)]
