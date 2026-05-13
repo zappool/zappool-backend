@@ -13,6 +13,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{env, sync::Arc};
 
+const DEFAULT_POOL: u8 = 0;
+const VALID_POOLS: [u8; 1] = [DEFAULT_POOL];
+
 #[derive(Clone)]
 struct AppState {
     dbfile: String,
@@ -38,6 +41,7 @@ struct WorkInsertRequest {
     uname_u: Option<String>,
     tdiff: Option<Value>,
     sec: Option<String>,
+    pool: Option<Value>,
 }
 
 async fn add_work(
@@ -98,8 +102,43 @@ async fn add_work(
             );
         }
     };
+    let pool = match data.pool {
+        Some(v) => {
+            match v
+                .as_u64()
+                .or_else(|| tdiff_raw.as_str().and_then(|s| s.parse().ok()))
+            {
+                Some(v) => {
+                    if v <= 255 {
+                        let v8 = v as u8;
+                        if VALID_POOLS.contains(&v8) {
+                            v8
+                        } else {
+                            return (
+                                StatusCode::BAD_REQUEST,
+                                Json(json!({"error": format!("Unknown pool {v8}")})),
+                            );
+                        }
+                    } else {
+                        return (
+                            StatusCode::BAD_REQUEST,
+                            Json(json!({"error": "Pool must be a byte"})),
+                        );
+                    }
+                }
+                None => {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({"error": "Pool must be an integer"})),
+                    );
+                }
+            }
+        }
+        // If pool is missing, use the default
+        None => DEFAULT_POOL,
+    };
 
-    println!("Received work: '{}' '{}' {}", uname_o, uname_u, tdiff);
+    println!("Received work: '{}' '{}' {} P{}", uname_o, uname_u, tdiff, pool);
 
     if secret != state.api_secret {
         println!("Wrong API secret received!");
@@ -119,7 +158,7 @@ async fn add_work(
         }
     };
 
-    match db_ws::insert_work_fullname(&conn, &uname_o, &uname_u, tdiff) {
+    match db_ws::insert_work_fullname(&conn, &uname_o, &uname_u, tdiff, pool) {
         Ok(_) => (
             StatusCode::CREATED,
             Json(json!({"message": "Work item added successfully"})),
