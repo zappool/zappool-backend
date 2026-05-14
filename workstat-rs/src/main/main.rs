@@ -1,3 +1,7 @@
+#[cfg(test)]
+// #[path = "tests.rs"]
+mod tests;
+
 use common_rs::db_ws;
 
 use axum::{
@@ -248,6 +252,15 @@ async fn get_work_after_id_handler(
     }
 }
 
+fn create_app(state: Arc<AppState>) -> Router {
+    Router::new()
+        .route("/api/ping", get(ping))
+        .route("/api/work-insert", post(add_work))
+        .route("/api/work-count", get(get_count))
+        .route("/api/get-work-after-id", get(get_work_after_id_handler))
+        .with_state(state)
+}
+
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
@@ -264,12 +277,7 @@ async fn main() {
 
     let state = Arc::new(AppState { dbfile, api_secret });
 
-    let app = Router::new()
-        .route("/api/ping", get(ping))
-        .route("/api/work-insert", post(add_work))
-        .route("/api/work-count", get(get_count))
-        .route("/api/get-work-after-id", get(get_work_after_id_handler))
-        .with_state(state);
+    let app = create_app(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:5004").await.unwrap();
     println!("Listening on port 5004");
