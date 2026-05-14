@@ -15,9 +15,10 @@ use dotenv;
 use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{env, sync::Arc};
+use std::{env, net::SocketAddr, sync::Arc};
+use tokio::sync::oneshot;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct AppState {
     dbfile: String,
     api_secret: String,
@@ -261,6 +262,52 @@ fn create_app(state: Arc<AppState>) -> Router {
         .with_state(state)
 }
 
+struct ServerHandle {
+    pub addr: SocketAddr,
+    #[cfg(test)]
+    shutdown_tx: oneshot::Sender<()>,
+    task: tokio::task::JoinHandle<()>,
+}
+
+impl ServerHandle {
+    #[cfg(test)]
+    async fn stop(self) {
+        let _ = self.shutdown_tx.send(());
+        let _ = self.task.await;
+    }
+
+    async fn wait(self) {
+        let _ = self.task.await;
+    }
+}
+
+async fn start_server(port: u16, dbfile: String, api_secret: String) -> ServerHandle {
+    let state = Arc::new(AppState { dbfile, api_secret });
+    let app = create_app(state);
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
+        .await
+        .unwrap();
+    let addr = listener.local_addr().unwrap();
+    #[cfg(not(test))]
+    let (_shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+    #[cfg(test)]
+    let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+    let task = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async {
+                shutdown_rx.await.ok();
+            })
+            .await
+            .unwrap();
+    });
+    ServerHandle {
+        addr,
+        #[cfg(test)]
+        shutdown_tx,
+        task,
+    }
+}
+
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
@@ -275,11 +322,7 @@ async fn main() {
     }
     println!("Using Api secret, {}", api_secret.len());
 
-    let state = Arc::new(AppState { dbfile, api_secret });
-
-    let app = create_app(state);
-
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:5004").await.unwrap();
-    println!("Listening on port 5004");
-    axum::serve(listener, app).await.unwrap();
+    let handle = start_server(5004, dbfile, api_secret).await;
+    println!("Listening on {}", handle.addr);
+    handle.wait().await;
 }
