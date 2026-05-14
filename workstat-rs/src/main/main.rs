@@ -20,5 +20,9 @@ async fn main() {
 
     let handle = start_server(5004, dbfile, api_secret).await;
     println!("Listening on {}", handle.addr);
-    handle.wait().await;
+    // Keep the process, never exit
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(30)).await
+    }
+    // handle.wait().await;
 }
