@@ -56,6 +56,7 @@ async fn test_work_insert() {
         "uname_u": "upstream.worker2",
         "tdiff": 131072,
         "sec": TEST_SECRET,
+        "pool": 1,
     });
     let response = reqwest::Client::new()
         .post(format!("http://localhost:{}/api/work-insert", PORT))
@@ -109,5 +110,27 @@ async fn test_work_count_after_insert() {
         let parsed = response.json::<HashMap<String, Value>>().await.unwrap();
         assert_eq!(parsed["work_count"], Value::Number(1.into()));
     }
+    server_handle.stop().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_work_insert_invalid_pool() {
+    let (_tmp, server_handle) = make_test_state().await;
+    let payload = json!({
+        "uname_o": "user1.worker1",
+        "uname_u": "upstream.worker2",
+        "tdiff": 131072,
+        "sec": TEST_SECRET,
+        "pool": 66,
+    });
+    let response = reqwest::Client::new()
+        .post(format!("http://localhost:{}/api/work-insert", PORT))
+        .header("Content-Type", "application/json")
+        .body(payload.to_string())
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     server_handle.stop().await;
 }
