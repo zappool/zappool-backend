@@ -1,6 +1,11 @@
 mod hook;
 
-use crate::hook::ZPHook;
+#[cfg(test)]
+mod client_stub;
+#[cfg(test)]
+mod tests;
+
+use crate::hook::{StratumHookedConfig, ZPHook};
 
 use anyhow::Result;
 use clap::Parser;
@@ -18,19 +23,24 @@ struct Args {
     /// Upstream Stratum V1 server address (host:port)
     #[arg(short, long, default_value = "127.0.0.1:3334")]
     upstream: String,
+
+    /// Upstream username
+    #[arg(short, long, default_value = "upstreamusername")]
+    upstream_user: String,
 }
 
-fn my_hooks() -> Vec<Box<dyn Hook>> {
+pub fn my_hooks(config: &StratumHookedConfig) -> Vec<Box<dyn Hook>> {
     let mut hooks: Vec<Box<dyn Hook>> = default_hooks();
-    hooks.push(Box::new(ZPHook::new()));
+    hooks.push(Box::new(ZPHook::new(config.clone())));
     hooks
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    let config = ProxyConfig::new(args.listen, args.upstream);
-    let proxy = Proxy::new(config, my_hooks());
+    let proxy_config = ProxyConfig::new(args.listen, args.upstream);
+    let hooked_config = StratumHookedConfig::new(args.upstream_user);
+    let proxy = Proxy::new(proxy_config, my_hooks(&hooked_config));
     proxy.start().await?;
     // Keep the process, never exit
     loop {
