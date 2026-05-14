@@ -2,18 +2,41 @@ use common_rs::username::map_full_username;
 use stratumv1_proxy_rs::{CommandMessage, Direction, Hook, ResponseMessage};
 
 use anyhow::Result;
+use serde::Serialize;
 use serde_json::Value;
 
 /// Configuration for the hooked Zappool Stratum proxy
 #[derive(Debug, Clone)]
 pub struct StratumHookedConfig {
     pub upstream_user: String,
+    pub workstat_api_url: String,
+    pub workstat_secret: String,
+    pub us_pool: u16,
 }
 
 impl StratumHookedConfig {
-    pub fn new(upstream_user: String) -> Self {
-        Self { upstream_user }
+    pub fn new(
+        upstream_user: String,
+        workstat_api_url: String,
+        workstat_secret: String,
+        us_pool: u16,
+    ) -> Self {
+        Self {
+            upstream_user,
+            workstat_api_url,
+            workstat_secret,
+            us_pool,
+        }
     }
+}
+
+#[derive(Serialize)]
+pub struct WorkInsertRequest {
+    uname_o: String,
+    uname_u: String,
+    tdiff: u32,
+    sec: String,
+    pool: u8,
 }
 
 ///  Our hook for proxying (username conversion, workstat saving)
@@ -46,14 +69,47 @@ impl Hook for ZPHook {
                         .as_str()
                         .unwrap_or_default();
                     if !user_o_full.is_empty() {
-                        let user_us_full =
+                        let user_u_full =
                             map_full_username(user_o_full, &self.config.upstream_user);
-                        params[0] = Value::String(user_us_full);
+
+                        // hook for accept, save to workstat
+                        // TODO: it's more precise to have this in datum_protocol_share_response(), but we don't have the username there
+                        let workstat_payload = WorkInsertRequest {
+                            uname_o: user_o_full.to_string(),
+                            uname_u: user_u_full.clone(),
+                            // TODO proper diff, where from?
+                            tdiff: 131072,
+                            sec: self.config.workstat_secret.clone(),
+                            pool: self.config.us_pool as u8,
+                        };
+                        let workstat_url =
+                            format!("{}/api/work-insert", self.config.workstat_api_url);
+                        match ureq::post(workstat_url.clone()).send_json(&workstat_payload) {
+                            Err(err) => println!(
+                                "ERROR! couldn't connect to Workstat server {} {:?}",
+                                workstat_url, err
+                            ),
+                            Ok(mut post) => {
+                                match post.body_mut().read_json::<serde_json::Value>() {
+                                    Err(err) => {
+                                        println!(
+                                            "ERROR! couldn't read Workstat response {:?}",
+                                            err
+                                        );
+                                    }
+                                    Ok(resp) => {
+                                        println!("Workstat response: {:?}", resp);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Substitute the username
+                        params[0] = Value::String(user_u_full);
                         return Ok(Some(params));
                     }
                 }
             }
-            // TODO: hook for accept, save to workstat
             return Ok(Some(params));
         }
         Ok(None)

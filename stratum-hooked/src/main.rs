@@ -3,6 +3,8 @@ mod hook;
 #[cfg(test)]
 mod client_stub;
 #[cfg(test)]
+mod test_workstat_int;
+#[cfg(test)]
 mod tests;
 
 use crate::hook::{StratumHookedConfig, ZPHook};
@@ -25,8 +27,20 @@ struct Args {
     upstream: String,
 
     /// Upstream username
-    #[arg(short, long, default_value = "upstreamusername")]
+    #[arg(long, default_value = "upstreamusername")]
     upstream_user: String,
+
+    /// Workstat API URL
+    #[arg(short, long, default_value = "http://localhost:5004")]
+    workstat_api: String,
+
+    /// Workstat API Secret
+    #[arg(long, default_value = "")]
+    workstat_secret: String,
+
+    /// Upstream pool number
+    #[arg(short('p'), long, default_value = "2")]
+    us_pool: u16,
 }
 
 pub fn my_hooks(config: &StratumHookedConfig) -> Vec<Box<dyn Hook>> {
@@ -39,7 +53,12 @@ pub fn my_hooks(config: &StratumHookedConfig) -> Vec<Box<dyn Hook>> {
 async fn main() -> Result<()> {
     let args = Args::parse();
     let proxy_config = ProxyConfig::new(args.listen, args.upstream);
-    let hooked_config = StratumHookedConfig::new(args.upstream_user);
+    let hooked_config = StratumHookedConfig::new(
+        args.upstream_user,
+        args.workstat_api,
+        args.workstat_secret,
+        args.us_pool,
+    );
     let proxy = Proxy::new(proxy_config, my_hooks(&hooked_config));
     proxy.start().await?;
     // Keep the process, never exit
