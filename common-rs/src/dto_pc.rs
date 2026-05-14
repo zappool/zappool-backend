@@ -1,3 +1,5 @@
+use crate::username::split_full_username;
+
 use chrono::DateTime;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -70,8 +72,8 @@ impl Work {
     }
 
     pub fn new_with_diff(uname_o: &str, uname_u: &str, tdiff: u32) -> Self {
-        let (uname_o, uname_o_wrkr) = Self::split_username_worker(uname_o);
-        let (uname_u, uname_u_wrkr) = Self::split_username_worker(uname_u);
+        let (uname_o, uname_o_wrkr) = split_full_username(uname_o);
+        let (uname_u, uname_u_wrkr) = split_full_username(uname_u);
         let now_utc = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -98,16 +100,6 @@ impl Work {
             0,
             0,
         )
-    }
-
-    pub fn split_username_worker(full_username: &str) -> (String, String) {
-        match full_username.find(".") {
-            None => (full_username.to_string(), "".to_string()),
-            Some(dotindex) => (
-                full_username[..dotindex].to_string(),
-                full_username[dotindex + 1..].to_string(),
-            ),
-        }
     }
 }
 

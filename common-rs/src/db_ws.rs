@@ -1,4 +1,5 @@
 use crate::dto_ws::Work;
+use crate::username::split_full_username;
 
 use rusqlite::{Connection, Row};
 use std::error::Error;
@@ -129,8 +130,8 @@ pub fn insert_work_fullname(
     uname_u: &str,
     tdiff: u32,
 ) -> Result<(), Box<dyn Error>> {
-    let (uname_o, uname_o_wrkr) = Work::split_username_worker(uname_o);
-    let (uname_u, uname_u_wrkr) = Work::split_username_worker(uname_u);
+    let (uname_o, uname_o_wrkr) = split_full_username(uname_o);
+    let (uname_u, uname_u_wrkr) = split_full_username(uname_u);
     let time_add = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -295,16 +296,5 @@ mod tests {
             let count = get_work_after_id(&conn, 0, 1, 2).unwrap();
             assert_eq!(count.iter().len(), 2);
         }
-    }
-
-    #[test]
-    fn test_split_username_worker() {
-        let (u, w) = Work::split_username_worker("user.worker");
-        assert_eq!(u, "user");
-        assert_eq!(w, "worker");
-
-        let (u, w) = Work::split_username_worker("user");
-        assert_eq!(u, "user");
-        assert_eq!(w, "");
     }
 }

@@ -37,14 +37,4 @@ impl Work {
             calc_payout,
         }
     }
-
-    pub fn split_username_worker(full_username: &str) -> (String, String) {
-        match full_username.find('.') {
-            None => (full_username.to_string(), String::new()),
-            Some(dot_idx) => (
-                full_username[..dot_idx].to_string(),
-                full_username[dot_idx + 1..].to_string(),
-            ),
-        }
-    }
 }
