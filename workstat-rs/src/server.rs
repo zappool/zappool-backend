@@ -220,13 +220,7 @@ async fn get_work_after_id_handler(
     Query(params): Query<GetWorkAfterIdParams>,
 ) -> (StatusCode, Json<Value>) {
     let start_id: i32 = match params.start_id.as_deref().and_then(|s| s.parse().ok()) {
-        Some(v) if v != 0 => v,
-        Some(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({"error": "Invalid 'start_id' parameter!"})),
-            );
-        }
+        Some(v) => v,
         None => {
             return (
                 StatusCode::BAD_REQUEST,
@@ -235,13 +229,7 @@ async fn get_work_after_id_handler(
         }
     };
     let start_time: u32 = match params.start_time.as_deref().and_then(|s| s.parse().ok()) {
-        Some(v) if v != 0 => v,
-        Some(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({"error": "Invalid 'start_time' parameter!"})),
-            );
-        }
+        Some(v) => v,
         None => {
             return (
                 StatusCode::BAD_REQUEST,
@@ -249,11 +237,12 @@ async fn get_work_after_id_handler(
             );
         }
     };
-    let limit: u32 = params
+    let mut limit: u32 = params
         .limit
         .as_deref()
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
+    limit = std::cmp::min(limit, 100);
 
     let conn = match get_db_connection(&state.dbfile, true) {
         Ok(c) => c,
@@ -302,13 +291,11 @@ fn create_app(state: Arc<AppState>) -> Router {
 
 pub struct ServerHandle {
     pub addr: SocketAddr,
-    // #[cfg(test)]
     shutdown_tx: oneshot::Sender<()>,
     task: tokio::task::JoinHandle<()>,
 }
 
 impl ServerHandle {
-    // #[cfg(test)]
     pub async fn stop(self) {
         let _ = self.shutdown_tx.send(());
         let _ = self.task.await;
@@ -326,9 +313,6 @@ pub async fn start_server(port: u16, dbfile: String, api_secret: String) -> Serv
         .await
         .unwrap();
     let addr = listener.local_addr().unwrap();
-    // #[cfg(not(test))]
-    // let (_shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
-    // #[cfg(test)]
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
     let task = tokio::spawn(async move {
         axum::serve(listener, app)
@@ -340,7 +324,6 @@ pub async fn start_server(port: u16, dbfile: String, api_secret: String) -> Serv
     });
     ServerHandle {
         addr,
-        // #[cfg(test)]
         shutdown_tx,
         task,
     }

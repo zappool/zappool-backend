@@ -2,6 +2,7 @@ use common_rs::username::map_full_username;
 use stratumv1_proxy_rs::{CommandMessage, Direction, Hook, ResponseMessage};
 
 use anyhow::Result;
+use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -50,8 +51,9 @@ impl ZPHook {
     }
 }
 
+#[async_trait]
 impl Hook for ZPHook {
-    fn process_command(
+    async fn process_command(
         &self,
         dir: Direction,
         _client_addr: std::net::SocketAddr,
@@ -74,33 +76,38 @@ impl Hook for ZPHook {
 
                         // hook for accept, save to workstat
                         // TODO: it's more precise to have this in datum_protocol_share_response(), but we don't have the username there
-                        let workstat_payload = WorkInsertRequest {
-                            uname_o: user_o_full.to_string(),
-                            uname_u: user_u_full.clone(),
-                            // TODO proper diff, where from?
-                            tdiff: 131072,
-                            sec: self.config.workstat_secret.clone(),
-                            pool: self.config.us_pool as u8,
-                        };
-                        let workstat_url =
-                            format!("{}/api/work-insert", self.config.workstat_api_url);
-                        match ureq::post(workstat_url.clone()).send_json(&workstat_payload) {
-                            Err(err) => println!(
-                                "ERROR! couldn't connect to Workstat server {} {:?}",
-                                workstat_url, err
-                            ),
-                            Ok(mut post) => {
-                                match post.body_mut().read_json::<serde_json::Value>() {
+                        if !self.config.workstat_api_url.is_empty() {
+                            let workstat_payload = WorkInsertRequest {
+                                uname_o: user_o_full.to_string(),
+                                uname_u: user_u_full.clone(),
+                                // TODO proper diff, where from?
+                                tdiff: 131072,
+                                sec: self.config.workstat_secret.clone(),
+                                pool: self.config.us_pool as u8,
+                            };
+                            let workstat_url =
+                                format!("{}/api/work-insert", self.config.workstat_api_url);
+                            match reqwest::Client::new()
+                                .post(&workstat_url)
+                                .json(&workstat_payload)
+                                .send()
+                                .await
+                            {
+                                Err(err) => println!(
+                                    "ERROR! couldn't connect to Workstat server {} {:?}",
+                                    workstat_url, err
+                                ),
+                                Ok(resp) => match resp.json::<serde_json::Value>().await {
                                     Err(err) => {
                                         println!(
                                             "ERROR! couldn't read Workstat response {:?}",
                                             err
                                         );
                                     }
-                                    Ok(resp) => {
-                                        println!("Workstat response: {:?}", resp);
+                                    Ok(body) => {
+                                        println!("Workstat response: {:?}", body);
                                     }
-                                }
+                                },
                             }
                         }
 
@@ -116,7 +123,7 @@ impl Hook for ZPHook {
     }
 
     /// Hook to use of a response before forwarding.
-    fn process_response(
+    async fn process_response(
         &self,
         _dir: Direction,
         _client_addr: std::net::SocketAddr,

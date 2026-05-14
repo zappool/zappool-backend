@@ -10,8 +10,9 @@ const UPSTREAM_USER: &str = "upstreamuser";
 fn default_hooked_config() -> StratumHookedConfig {
     StratumHookedConfig::new(
         UPSTREAM_USER.into(),
-        "http://localhost:5004".to_string(),
-        "workstatsecret".to_string(),
+        // Empty for workstat server, not used in this test
+        "".to_string(),
+        "".to_string(),
         1,
     )
 }
