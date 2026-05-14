@@ -1,44 +1,101 @@
 use crate::my_hooks;
 use crate::{client_stub::ClientStub, hook::StratumHookedConfig};
 
+use common_rs::db_ws::db_setup_from_to;
+use workstat_rs::server::{ServerHandle, start_server};
+
+use reqwest::StatusCode;
+use rusqlite::Connection;
 use serde_json::json;
 use serial_test::serial;
+use std::time::{Duration, Instant};
 use stratumv1_proxy_rs::{Proxy, ProxyConfig, ServerStub};
+use tempfile::NamedTempFile;
 
 const UPSTREAM_USER: &str = "upstreamuser";
+const WORKSTAT_SECRET: &str = "test_secret_integration";
+const WORKSTAT_URL: &str = "http://localhost:5004";
+const WORKSTAT_PORT: u16 = 5004;
 
 fn default_hooked_config() -> StratumHookedConfig {
     StratumHookedConfig::new(
         UPSTREAM_USER.into(),
-        "http://localhost:5004".to_string(),
-        "workstatsecret".to_string(),
+        WORKSTAT_URL.to_string(),
+        WORKSTAT_SECRET.to_string(),
         1,
     )
 }
 
+struct WorkstatServer {
+    /// Needed to keep reference
+    #[warn(dead_code)]
+    tempfile: NamedTempFile,
+    // _dir: TempDir,
+    // child: Child,
+    server_handle: ServerHandle,
+}
+
+impl WorkstatServer {
+    async fn start() -> Self {
+        let tempfile = NamedTempFile::new().unwrap();
+        let path = tempfile.path().to_str().unwrap().to_string();
+        let conn = Connection::open(&path).unwrap();
+        db_setup_from_to(&conn, Some(0), None).unwrap();
+        drop(conn);
+
+        let server_handle = start_server(WORKSTAT_PORT, path.clone(), WORKSTAT_SECRET.into()).await;
+
+        let server = WorkstatServer {
+            tempfile,
+            server_handle,
+        };
+        server.wait_ready().await;
+        server
+    }
+
+    async fn wait_ready(&self) {
+        let client = reqwest::Client::new();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while Instant::now() < deadline {
+            if let Ok(r) = client.get(format!("{WORKSTAT_URL}/api/ping")).send().await {
+                if r.status().is_success() {
+                    return;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        panic!("workstat-rs server did not become ready within 10s");
+    }
+}
+
 #[tokio::test]
 #[serial]
-async fn test_proxy_connect_only() {
-    let server_addr = "127.0.0.1:43333";
-    let proxy_addr = "127.0.0.1:53333";
+async fn test_workstat_starts_and_pings() {
+    let ws = WorkstatServer::start().await;
 
-    let server = ServerStub::new(server_addr);
-    let _ = server.start().await.unwrap();
+    let response = reqwest::get(format!("{WORKSTAT_URL}/api/ping"))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let parsed: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(parsed["pong"], "ok");
 
-    let proxy_config = ProxyConfig::new(proxy_addr.to_string(), server_addr.to_string());
-    let proxy = Proxy::new(proxy_config, my_hooks(&default_hooked_config()));
-    let _ = proxy.start().await.unwrap();
+    ws.server_handle.stop().await;
+}
 
-    let mut client = ClientStub::new(proxy_addr, "username.device");
-    let _ = client.start().await.unwrap();
+#[tokio::test]
+#[serial]
+async fn test_workstat_work_count_starts_empty() {
+    let ws = WorkstatServer::start().await;
 
-    let _ = client.stop(false).await.unwrap();
-    let _ = proxy.stop(false).await.unwrap();
-    let _ = server.stop(true).await.unwrap();
+    let response = reqwest::get(format!("{WORKSTAT_URL}/api/work-count"))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let json: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(json["work_count"], 0);
 
-    assert_eq!(server.get_connect_count().await, 1);
-    assert_eq!(server.get_message_count().await, 0);
-    assert_eq!(client.get_message_count().await, 0);
+    ws.server_handle.stop().await;
 }
 
 #[tokio::test]
@@ -46,6 +103,8 @@ async fn test_proxy_connect_only() {
 async fn test_proxy_mining_submit() {
     let server_addr = "127.0.0.1:43333";
     let proxy_addr = "127.0.0.1:53333";
+
+    let ws = WorkstatServer::start().await;
 
     let server = ServerStub::new(server_addr);
     let _ = server.start().await.unwrap();
@@ -113,4 +172,6 @@ async fn test_proxy_mining_submit() {
     assert_eq!(resp4.method().unwrap(), "mining.notify");
     let resp5 = client.get_message_by_id("5").await.unwrap();
     assert_eq!(resp5.to_string(), "5 null true");
+
+    ws.server_handle.stop().await;
 }
