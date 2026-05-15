@@ -1,13 +1,13 @@
-# TODO: paycalc-rs and payer should be also brough in here
+# TODO: paycalc-rs should be also brought in here
 
 [workspace]
 members = [
     "common-rs",
+    "payer",
     "workstat-rs",
 ]
 exclude = [
     "paycalc-rs",
-    "payer",
 ]
 resolver = "2"
 
