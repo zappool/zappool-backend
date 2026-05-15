@@ -271,7 +271,6 @@ fn create_app(state: Arc<AppState>) -> Router {
 
 pub struct ServerHandle {
     pub addr: SocketAddr,
-    #[cfg(test)]
     shutdown_tx: oneshot::Sender<()>,
     task: tokio::task::JoinHandle<()>,
 }
@@ -295,21 +294,19 @@ pub async fn start_server(port: u16, dbfile: String, api_secret: String) -> Serv
         .await
         .unwrap();
     let addr = listener.local_addr().unwrap();
-    #[cfg(not(test))]
-    let (_shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
-    #[cfg(test)]
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
     let task = tokio::spawn(async move {
+        println!("Starting axum serve...");
         axum::serve(listener, app)
             .with_graceful_shutdown(async {
                 shutdown_rx.await.ok();
             })
             .await
             .unwrap();
+        println!("axum serve done");
     });
     ServerHandle {
         addr,
-        #[cfg(test)]
         shutdown_tx,
         task,
     }
