@@ -9,7 +9,7 @@ Wants=network-online.target
 
 [Service]
 WorkingDirectory=/home/ubuntu/zappool
-ExecStart=/home/ubuntu/zappool/workstat-rs/target/debug/main
+ExecStart=/home/ubuntu/zappool/target/debug/workstat
 
 # Make sure the config directory is readable by the service user
 #PermissionsStartOnly=true

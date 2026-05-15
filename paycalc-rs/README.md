@@ -28,7 +28,7 @@ mv ./data/_new_paycalc.db ./data/paycalc.db
 Save Nostr secret for zapping:
 
 ```
-cd payer && cargo build --bin payer_nsec_tool && cd ..
+cargo build --bin payer_nsec_tool
 ./payer/target/debug/payer_nsec_tool --set [--weakpw]
 ./payer/target/debug/payer_nsec_tool
 ```
