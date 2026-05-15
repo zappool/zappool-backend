@@ -5,9 +5,9 @@ edition = "2024"
 
 [dependencies]
 common-rs = { path = "../common-rs" }
-dotenv = "0.15.0"
+dotenv = "0.15"
 payer = { path = "../payer" }
-rusqlite = "0.37.0"
+rusqlite = "0.37"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [[bin]]
