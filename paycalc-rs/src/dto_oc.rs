@@ -6,15 +6,17 @@ pub struct BlockEarning {
     pub block_hash: String,
     pub earned_sats: u64,
     pub pool_fee: u32,
+    pub pool: u8,
 }
 
 impl BlockEarning {
-    pub fn new(time: u32, block_hash: String, earned_sats: u64, pool_fee: u32) -> Self {
+    pub fn new(time: u32, block_hash: String, earned_sats: u64, pool_fee: u32, pool: u8) -> Self {
         Self {
             time,
             block_hash,
             earned_sats,
             pool_fee,
+            pool,
         }
     }
 }

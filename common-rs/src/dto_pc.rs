@@ -15,6 +15,7 @@ pub struct Work {
     pub uname_u_id: u32,
     pub uname_u_wrkr_id: u32,
     pub tdiff: u32,
+    pub pool: u8,
     pub time_add: f64,
     pub payed: u64,
     pub payed_time: u32,
@@ -38,6 +39,7 @@ impl Work {
         uname_u_id: u32,
         uname_u_wrkr_id: u32,
         tdiff: u32,
+        pool: u8,
         time_add: f64,
         payed: u64,
         payed_time: u32,
@@ -59,6 +61,7 @@ impl Work {
             uname_u_id,
             uname_u_wrkr_id,
             tdiff,
+            pool,
             time_add,
             payed,
             payed_time,
@@ -71,7 +74,7 @@ impl Work {
         }
     }
 
-    pub fn new_with_diff(uname_o: &str, uname_u: &str, tdiff: u32) -> Self {
+    pub fn new_with_diff(uname_o: &str, uname_u: &str, tdiff: u32, pool: u8) -> Self {
         let (uname_o, uname_o_wrkr) = split_full_username(uname_o);
         let (uname_u, uname_u_wrkr) = split_full_username(uname_u);
         let now_utc = SystemTime::now()
@@ -90,6 +93,7 @@ impl Work {
             0,
             0,
             tdiff,
+            pool,
             time_add,
             0,
             0,
@@ -110,6 +114,7 @@ pub struct Block {
     pub earned_sats: u64,
     pub pool_fee: u32,
     pub acc_total_diff: u64,
+    pub pool: u8,
 }
 
 impl Block {
@@ -119,6 +124,7 @@ impl Block {
         earned_sats: u64,
         pool_fee: u32,
         acc_total_diff: u64,
+        pool: u8,
     ) -> Self {
         Self {
             time,
@@ -126,6 +132,7 @@ impl Block {
             earned_sats,
             pool_fee,
             acc_total_diff,
+            pool,
         }
     }
 }
@@ -134,12 +141,13 @@ impl ToString for Block {
     fn to_string(&self) -> String {
         let t = DateTime::from_timestamp(self.time as i64, 0).unwrap_or_default();
         format!(
-            "{} {} {} {} {}",
+            "{} {} {} {} {} {}",
             t.to_string(),
             self.block_hash,
             self.earned_sats,
             self.pool_fee,
-            self.acc_total_diff
+            self.acc_total_diff,
+            self.pool,
         )
     }
 }

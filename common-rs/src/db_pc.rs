@@ -7,7 +7,7 @@ use rusqlite::{Connection, Params, Row, Transaction};
 use std::error::Error;
 
 static BLOCKS_WINDOW: u8 = 8;
-pub static LATEST_DB_VERSION: u8 = 4;
+pub static LATEST_DB_VERSION: u8 = 5;
 
 // Upgrade from an older version, versions taken from args
 pub fn db_setup(conn: &Connection) -> Result<(), Box<dyn Error>> {
@@ -30,6 +30,9 @@ fn db_setup_from_to(
     }
     if vfrom <= 3 && vto >= 4 {
         db_update_3_4(conn)?;
+    }
+    if vfrom <= 4 && vto >= 5 {
+        db_update_4_5(conn)?;
     }
 
     Ok(())
@@ -231,6 +234,23 @@ fn db_update_3_4(conn: &Connection) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn db_update_4_5(conn: &Connection) -> Result<(), Box<dyn Error>> {
+    let _ = ensure_db_version(conn, 4)?;
+
+    // Upstream Pool, u8. Valid values: 1: Ocean, etc. Default: 1
+    let _ = conn.execute("ALTER TABLE WORK ADD USPool INTEGER", [])?;
+    let _ = conn.execute("UPDATE WORK SET USPool = 1", [])?;
+
+    let _ = conn.execute("ALTER TABLE PC_BLOCK ADD USPool INTEGER", [])?;
+    let _ = conn.execute("UPDATE PC_BLOCK SET USPool = 1", [])?;
+
+    let _ = set_current_db_version(conn, 5)?;
+
+    // Note: auto commit
+
+    Ok(())
+}
+
 pub fn get_status(conn: &Connection) -> Result<(i32, u32, u32, i32, u32), Box<dyn Error>> {
     let mut stmt = conn.prepare(
         "SELECT \
@@ -257,6 +277,7 @@ fn _block_from_row(row: &Row) -> Result<Block, rusqlite::Error> {
         row.get::<_, u64>(2)?,
         row.get::<_, u32>(3)?,
         row.get::<_, u64>(4)?,
+        row.get::<_, u8>(5)?,
     );
     // println!("_block_from_row {0}", b.block_hash);
     Ok(b)
@@ -498,7 +519,7 @@ where
 {
     let query_str = "SELECT \
         Id, UNameO, UNameOWrkr, UNameU, UNameUWrkr, \
-        TDiff, TimeAdd, \
+        TDiff, Pool, TimeAdd, \
         Payed, PayedTime, PayedRef, \
         Committed, CommitBlocks, CommitFirstTime, CommitNextTime, Estimate \
         FROM WORK "
@@ -518,15 +539,16 @@ where
                 row.get::<_, u32>(3)?,
                 row.get::<_, u32>(4)?,
                 row.get::<_, u32>(5)?,
-                row.get::<_, f64>(6)?,
-                row.get::<_, u64>(7)?,
-                row.get::<_, u32>(8)?,
-                row.get::<_, String>(9)?,
-                row.get::<_, u64>(10)?,
-                row.get::<_, u16>(11)?,
-                row.get::<_, u32>(12)?,
+                row.get::<_, u8>(6)?,
+                row.get::<_, f64>(7)?,
+                row.get::<_, u64>(8)?,
+                row.get::<_, u32>(9)?,
+                row.get::<_, String>(10)?,
+                row.get::<_, u64>(11)?,
+                row.get::<_, u16>(12)?,
                 row.get::<_, u32>(13)?,
-                row.get::<_, u64>(14)?,
+                row.get::<_, u32>(14)?,
+                row.get::<_, u64>(15)?,
             ))
         })?
         .filter(|res| res.is_ok())
@@ -735,7 +757,7 @@ pub fn block_get_new_blocks(
 ) -> Result<Vec<Block>, Box<dyn Error>> {
     let mut stmt = conn.prepare(
         "SELECT \
-            Time, BlockHash, Earning, PoolFee, AccTotalDiff \
+            Time, BlockHash, Earning, PoolFee, AccTotalDiff, Pool \
             FROM PC_BLOCK \
             WHERE Time > ?1 \
             ORDER BY Time ASC",

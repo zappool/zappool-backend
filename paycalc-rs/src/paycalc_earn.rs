@@ -167,6 +167,7 @@ fn retrieve_new_workitems(
             0,
             0,
             wi.tdiff,
+            wi.pool,
             wi.time_add,
             0,
             0,
@@ -234,7 +235,7 @@ fn retrieve_new_blocks(
 
     let conntx = conn.transaction()?;
     for bo in new_blocks {
-        let bp = Block::new(bo.time, bo.block_hash, bo.earned_sats, bo.pool_fee, 0);
+        let bp = Block::new(bo.time, bo.block_hash, bo.earned_sats, bo.pool_fee, 0, bo.pool);
         let _ = db::block_insert(&conntx, &bp, now_utc)?;
     }
 

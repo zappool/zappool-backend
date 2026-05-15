@@ -4,6 +4,8 @@ use rusqlite::{Connection, Row};
 use std::error::Error;
 use std::vec::Vec;
 
+const OCEAN_POOL: u8 = 1;
+
 fn blockearning_from_row(row: &Row) -> Result<BlockEarning, rusqlite::Error> {
     // println!("blockearning_from_row {0:?}", row);
     let w = BlockEarning::new(
@@ -11,6 +13,7 @@ fn blockearning_from_row(row: &Row) -> Result<BlockEarning, rusqlite::Error> {
         row.get::<_, String>(1)?,
         row.get(2)?,
         row.get(3)?,
+        OCEAN_POOL,
     );
     // println!("blockearning_from_row {0}", w.block_hash);
     Ok(w)
