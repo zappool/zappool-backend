@@ -21,10 +21,10 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: Build Rust
       run: |
-        cd common-rs && cargo build && cd ..
+        cargo build
+        # The rest should be also moved to common building
         cd payer && cargo build && cd ..
         cd paycalc-rs && cargo build && cd ..
-        cd workstat-rs && cargo build && cd ..
 
   test:
     name: Test
@@ -37,10 +37,10 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: Run unit tests
       run: |
-        cd common-rs && cargo test && cd ..
+        cargo test
+        # The rest should be also moved to common building
         cd payer && cargo test && cd ..
         cd paycalc-rs && cargo test && cd ..
-        cd workstat-rs && cargo test && cd ..
 
   check:
     name: Check fmt, clippy
@@ -51,8 +51,7 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: |
-          cd common-rs && cargo fmt --all -- --check && cd ..
+          cargo fmt --all -- --check
           cd payer && cargo fmt --all -- --check && cd ..
           cd paycalc-rs && cargo fmt --all -- --check && cd ..
-          cd workstat-rs && cargo fmt --all -- --check && cd ..
           # cargo clippy --all-features -- -D warnings
