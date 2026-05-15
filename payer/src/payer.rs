@@ -1,9 +1,10 @@
 use crate::cln_pay::pay_invoice;
-use crate::common::{PayerParameters, PaymentMethod, PaymentResult, shorten_id};
+use crate::common::{PayerParameters, PaymentMethod, PaymentResult};
 use crate::ln_address::get_invoice_from_ln_address;
 use crate::nostr_profile::get_nostr_ln_address;
 use crate::nostr_zap::{nostr_zap, npub_from_secret_vec};
 
+use common_rs::common::shorten_id;
 use common_rs::common_db::get_db_file;
 use common_rs::db_pc as db;
 use common_rs::dto_pc::{PayRequest, Payment};

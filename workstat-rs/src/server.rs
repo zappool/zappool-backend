@@ -1,3 +1,4 @@
+use common_rs::common::shorten_id;
 use common_rs::db_ws;
 
 use axum::{
@@ -98,7 +99,7 @@ async fn add_work(
         }
     };
 
-    println!("Received work: '{}' '{}' {}", uname_o, uname_u, tdiff);
+    // println!("Received work: '{}' '{}' {}", shorten_id(&uname_o), shorten_id(&uname_u), tdiff);
 
     if secret != state.api_secret {
         println!("Wrong API secret received!");
@@ -111,6 +112,7 @@ async fn add_work(
     let conn = match get_db_connection(&state.dbfile, false) {
         Ok(c) => c,
         Err(e) => {
+            println!("DB connection error: {e}");
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"error": format!("DB connection error: {e}")})),
@@ -119,14 +121,25 @@ async fn add_work(
     };
 
     match db_ws::insert_work_fullname(&conn, &uname_o, &uname_u, tdiff) {
-        Ok(_) => (
-            StatusCode::CREATED,
-            Json(json!({"message": "Work item added successfully"})),
-        ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Error inserting {e}")})),
-        ),
+        Err(e) => {
+            println!("Error inserting: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Error inserting {e}")})),
+            )
+        }
+        Ok(_) => {
+            println!(
+                "Inserted work: '{}' '{}' {}",
+                shorten_id(&uname_o),
+                shorten_id(&uname_u),
+                tdiff
+            );
+            (
+                StatusCode::CREATED,
+                Json(json!({"message": "Work item added successfully"})),
+            )
+        }
     }
 }
 

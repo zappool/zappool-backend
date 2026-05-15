@@ -23,7 +23,6 @@ jobs:
       run: |
         cargo build
         # The rest should be also moved to common building
-        cd payer && cargo build && cd ..
         cd paycalc-rs && cargo build && cd ..
 
   test:
@@ -39,7 +38,6 @@ jobs:
       run: |
         cargo test
         # The rest should be also moved to common building
-        cd payer && cargo test && cd ..
         cd paycalc-rs && cargo test && cd ..
 
   check:
@@ -52,6 +50,5 @@ jobs:
           components: rustfmt, clippy
       - run: |
           cargo fmt --all -- --check
-          cd payer && cargo fmt --all -- --check && cd ..
           cd paycalc-rs && cargo fmt --all -- --check && cd ..
           # cargo clippy --all-features -- -D warnings
