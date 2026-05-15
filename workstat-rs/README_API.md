@@ -12,8 +12,8 @@ The API is configured to use a SQLite database file named `workstat.db`.
 To start the API server, from the main directory run:
 
 ```bash
-cd workstat-rs && cargo build && cd ..
-./workstat-rs/target/debug/main
+cargo build
+./target/debug/workstat
 ```
 
 This will start a development server on `http://localhost:5000`.
