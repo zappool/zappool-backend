@@ -23,6 +23,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// The portion of earning considered for payout of the the only-estimated-not-committed amount
 const PAYOUT_RATIO_FOR_ESTIMATED: f64 = 0.67;
+/// Delay before retrying a failed payreq iteration
+const PAYREQ_RETRY_DELAY_SECS: u64 = 60;
+/// Max number of payreq iteration attempts per period (incl. the first one)
+const PAYREQ_MAX_ATTEMPTS: u32 = 15;
 
 fn print_miner_snapshot(ss: &MinerSnapshot) {
     print!(
@@ -450,6 +454,7 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as u32;
+        // Compute the time for the next periodic (daily) run:
         let next_new_time = ((now_utc as f64) / (payout_period_secs as f64)).round() as u32
             * payout_period_secs
             + (payout_period_secs / 2);
@@ -482,11 +487,29 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
         }
 
         // Time!
-        println!("paycalc_payreq loop_iteration: Start iteration ...");
-        let res = iteration(&mut conn, default_payment_method);
-        println!("paycalc_payreq loop_iteration: iteration done ({:?})", res);
-        if let Err(e) = res {
-            println!("ERROR in iteration, {e}");
+        // On error (e.g. DB locked by a parallel writer), retry after a short delay,
+        // instead of skipping until the next period.
+        // Retrying is safe: snapshot updates are recomputed, and miners with an open pay request are skipped.
+        let mut attempt = 1;
+        loop {
+            println!("paycalc_payreq loop_iteration: Start iteration (attempt {attempt}) ...");
+            let res = iteration(&mut conn, default_payment_method);
+            println!("paycalc_payreq loop_iteration: iteration done ({:?})", res);
+            match res {
+                Ok(_) => break,
+                Err(e) => {
+                    println!("ERROR in payreq iteration (attempt {attempt}), {:?}", e);
+                    if attempt >= PAYREQ_MAX_ATTEMPTS {
+                        println!(
+                            "ERROR: payreq iteration failed {attempt} times, giving up until next period"
+                        );
+                        break;
+                    }
+                    println!("Retrying payreq iteration in {PAYREQ_RETRY_DELAY_SECS} secs ...");
+                    thread::sleep(Duration::from_secs(PAYREQ_RETRY_DELAY_SECS));
+                    attempt += 1;
+                }
+            }
         }
     }
     // Ok(())
