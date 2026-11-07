@@ -6,7 +6,7 @@ Documentation=https://github.com/OCEAN-xyz/datum_gateway
 After=network-online.target
 Wants=network-online.target
 Requires=bitcoind.service
-Requires=zappool-workstat.service
+Requires=zappool-workstat-rs.service
 
 [Service]
 ExecStart=/home/ubuntu/datum/datum_gateway -c /home/ubuntu/datum/config.json
