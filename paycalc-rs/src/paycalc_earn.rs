@@ -704,8 +704,8 @@ pub fn loop_iterations(
         match iteration(conn, conn_workstat_ro, conn_oceanmgr_ro, &mut status) {
             Ok(_) => {}
             Err(err) => {
-                println!("ERROR in iteration, {}", err.to_string());
-                continue;
+                // Don't retry right away, fall through to the normal sleep
+                println!("ERROR in earn iteration, {:?}", err);
             }
         }
 
