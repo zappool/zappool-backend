@@ -7,7 +7,7 @@ use rusqlite::{Connection, Params, Row, Transaction};
 use std::error::Error;
 
 static BLOCKS_WINDOW: u8 = 8;
-pub static LATEST_DB_VERSION: u8 = 4;
+pub static LATEST_DB_VERSION: u8 = 5;
 
 // Upgrade from an older version, versions taken from args
 pub fn db_setup(conn: &Connection) -> Result<(), Box<dyn Error>> {
@@ -30,6 +30,9 @@ fn db_setup_from_to(
     }
     if vfrom <= 3 && vto >= 4 {
         db_update_3_4(conn)?;
+    }
+    if vfrom <= 4 && vto >= 5 {
+        db_update_4_5(conn)?;
     }
 
     Ok(())
@@ -225,6 +228,26 @@ fn db_update_3_4(conn: &Connection) -> Result<(), Box<dyn Error>> {
     let _ = conn.execute("UPDATE MINER_SS SET CommitLastTime = Time", [])?;
 
     let _ = set_current_db_version(conn, 4)?;
+
+    // Note: auto commit
+
+    Ok(())
+}
+
+// v5: Indexes only, for performance (no schema change)
+fn db_update_4_5(conn: &Connection) -> Result<(), Box<dyn Error>> {
+    let _ = ensure_db_version(conn, 4)?;
+
+    // For per-miner work totals (work_get_user_totals), avoids a full WORK scan per miner.
+    // Covering index: the query is answered from the index alone.
+    let _ = conn.execute(
+        "CREATE INDEX WorkUNameO ON WORK (UNameO, Committed, Estimate, CommitNextTime)",
+        [],
+    )?;
+    // For per-miner paid totals (payment_get_total_paid_to_miner)
+    let _ = conn.execute("CREATE INDEX PayreqMinerId ON PAYREQ (MinerId)", [])?;
+
+    let _ = set_current_db_version(conn, 5)?;
 
     // Note: auto commit
 
