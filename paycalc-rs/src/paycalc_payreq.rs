@@ -450,6 +450,7 @@ pub fn loop_iterations() -> Result<(), Box<dyn Error>> {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as u32;
+        // Compute the time for the next periodic (daily) run:
         let next_new_time = ((now_utc as f64) / (payout_period_secs as f64)).round() as u32
             * payout_period_secs
             + (payout_period_secs / 2);
