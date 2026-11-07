@@ -449,7 +449,10 @@ async fn iteration(
     if !open_requests.is_empty() {
         println!("Open pay requests: {}", open_requests.len());
         for (pr, paym) in &open_requests {
-            let _ = process_payment_start(payer_params, conn, pr, paym).await?;
+            // An error in one payment should not prevent processing the others
+            if let Err(e) = process_payment_start(payer_params, conn, pr, paym).await {
+                println!("ERROR in payer payment, rid {}, {:?}", pr.id, e);
+            }
         }
     }
     Ok(())
@@ -482,7 +485,7 @@ pub async fn loop_iterations() -> Result<(), Box<dyn Error>> {
         match iteration(&payer_params, &mut conn).await {
             Ok(_) => {}
             Err(e) => {
-                println!("ERROR in iteration, {:?}", e);
+                println!("ERROR in payer iteration, {:?}", e);
                 continue;
             }
         };
